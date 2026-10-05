@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent } from 'react';
 import { WidgetSVG } from '../design/render';
-import { baseHeight, baseWidth, MAX_GRID } from '../design/types';
+import { baseHeight, baseWidth } from '../design/types';
 import { SAMPLE_CODES, conditionText } from '../design/format';
 import { useStore } from '../store';
 
@@ -13,6 +13,12 @@ function useNow(intervalMs: number): Date {
   }, [intervalMs]);
   return now;
 }
+
+const SIZES = [
+  { cols: 4, rows: 2, label: 'Обычный' },
+  { cols: 4, rows: 4, label: 'Большой' },
+  { cols: 2, rows: 2, label: 'Квадрат' },
+];
 
 export function Stage() {
   const design = useStore((s) => s.design);
@@ -62,15 +68,19 @@ export function Stage() {
     }
   };
 
-  const step = (key: 'cols' | 'rows', delta: number) => {
-    const v = Math.min(MAX_GRID, Math.max(1, design[key] + delta));
-    updateMeta({ [key]: v }, false);
-  };
+  const setSize = (cols: number, rows: number) => updateMeta({ cols, rows }, false);
 
   return (
     <section className="stage" aria-label="Предпросмотр виджета">
+      <div className="stage-heading">
+        <div>
+          <span className="eyebrow">ПРЕДПРОСМОТР</span>
+          <strong>{design.name}</strong>
+        </div>
+        <span className="live-dot">● Живой</span>
+      </div>
       <div className="wallpaper" onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
-        <div className="widget-frame" style={{ maxWidth: `min(${Math.round(W * 1.7)}px, 520px, calc(34vh * ${W} / ${H}))` }}>
+        <div className="widget-frame" style={{ maxWidth: `min(${Math.round(W * 1.7)}px, 560px, calc(35vh * ${W} / ${H}))` }}>
           <WidgetSVG
             design={design}
             now={now}
@@ -84,29 +94,28 @@ export function Stage() {
         </div>
       </div>
 
-      <div className="stage-bar">
-        <div className="stepper" aria-label="Ширина в ячейках">
-          <button type="button" onClick={() => step('cols', -1)} aria-label="Уже">−</button>
-          <span>{design.cols} × {design.rows}</span>
-          <button type="button" onClick={() => step('cols', 1)} aria-label="Шире">+</button>
-        </div>
-        <div className="stepper" aria-label="Высота в ячейках">
-          <button type="button" onClick={() => step('rows', -1)} aria-label="Ниже">−</button>
-          <span>высота</span>
-          <button type="button" onClick={() => step('rows', 1)} aria-label="Выше">+</button>
-        </div>
-        <label className="sample">
-          <span>Погода в превью</span>
-          <select value={preview.code} onChange={(e) => setPreview({ code: Number(e.target.value) })}>
-            {SAMPLE_CODES.map((c) => (
-              <option key={c} value={c}>{conditionText(c, 'ru')}</option>
+      <div className="stage-controls">
+        <div className="control-group">
+          <span className="control-label">Размер</span>
+          <div className="choice-row">
+            {SIZES.map((size) => (
+              <button key={`${size.cols}x${size.rows}`} type="button" className={design.cols === size.cols && design.rows === size.rows ? 'choice on' : 'choice'} onClick={() => setSize(size.cols, size.rows)}>
+                <strong>{size.cols}×{size.rows}</strong><small>{size.label}</small>
+              </button>
             ))}
-          </select>
-        </label>
-        <label className="sample">
-          <span>{Math.round(preview.tempC)}°</span>
-          <input type="range" min={-30} max={45} value={Math.round(preview.tempC)} onChange={(e) => setPreview({ tempC: Number(e.target.value), hiC: Number(e.target.value) + 3, loC: Number(e.target.value) - 6 })} aria-label="Температура в превью" />
-        </label>
+          </div>
+        </div>
+
+        <div className="control-group compact-control">
+          <span className="control-label">Погода в превью</span>
+          <div className="preview-weather">
+            <select value={preview.code} onChange={(e) => setPreview({ code: Number(e.target.value) })} aria-label="Состояние погоды">
+              {SAMPLE_CODES.map((c) => <option key={c} value={c}>{conditionText(c, 'ru')}</option>)}
+            </select>
+            <input type="range" min={-30} max={45} value={Math.round(preview.tempC)} onChange={(e) => setPreview({ tempC: Number(e.target.value), hiC: Number(e.target.value) + 3, loC: Number(e.target.value) - 6 })} aria-label="Температура в превью" />
+            <strong>{Math.round(preview.tempC)}°</strong>
+          </div>
+        </div>
       </div>
     </section>
   );

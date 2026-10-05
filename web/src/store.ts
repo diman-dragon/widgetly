@@ -78,13 +78,13 @@ export const useStore = create<State>()((set, get) => {
   };
 
   return {
-    design: loadDraft() ?? fromTemplate('night'),
+    design: loadDraft() ?? fromTemplate('glass-weather'),
     selectedId: null,
     past: [],
     future: [],
     saved: [],
     info: null,
-    tab: 'layers',
+    tab: 'templates',
     toast: null,
     dirty: false,
     preview: { tempC: 21.4, code: 2, isDay: true, hiC: 24.2, loC: 14.8, city: 'Москва' },
@@ -170,11 +170,11 @@ export const useStore = create<State>()((set, get) => {
       set({ design: cloneKeepId(d), selectedId: null, past: [], future: [], dirty: false, tab: 'layers' });
     },
     useTemplate(key) {
-      set({ design: fromTemplate(key), selectedId: null, past: [], future: [], dirty: true, tab: 'layers' });
+      set({ design: fromTemplate(key), selectedId: null, past: [], future: [], dirty: true, tab: 'templates' });
       get().say('Шаблон применён. Сохраните дизайн, чтобы он появился в «Мои»');
     },
     newBlank() {
-      set({ design: newDesign(), selectedId: null, past: [], future: [], dirty: true, tab: 'layers' });
+      set({ design: newDesign(), selectedId: null, past: [], future: [], dirty: true, tab: 'templates' });
     },
 
     async save() {

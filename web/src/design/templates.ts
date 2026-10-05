@@ -11,7 +11,43 @@ function make(name: string, patch: Partial<Design>, layers: Design['layers']): D
   return { ...d, ...patch, name, layers };
 }
 
+/**
+ * Готовые пресеты. Они намеренно решают задачу «выбрал — и готово».
+ * Точные параметры по-прежнему можно открыть в «Настроить».
+ */
 export const TEMPLATES: Template[] = [
+  {
+    key: 'glass-weather',
+    build: () =>
+      make(
+        'Стекло · погода',
+        {
+          cols: 4,
+          rows: 2,
+          bg: { type: 'gradient', c1: '#26355f', c2: '#d88b93', angle: 140, radius: 28, opacity: 1 },
+        },
+        [
+          defaultLayer('shape', { x: 0.77, y: 0.52, w: 190, h: 108, radius: 26, color: '#ffffff', opacity: 0.09 }),
+          defaultLayer('clockDigital', { x: 0.08, y: 0.39, size: 48, font: 'sans-thin', weight: 'normal', color: '#ffffff', format: 'HH:mm' }),
+          defaultLayer('date', { x: 0.08, y: 0.77, size: 15, font: 'sans-light', color: '#e7eaf5', format: 'EEEE, d MMMM' }),
+          defaultLayer('weatherCity', { x: 0.94, y: 0.19, size: 13, font: 'sans', color: '#ffffff', align: 'right' }),
+          defaultLayer('weatherIcon', { x: 0.70, y: 0.48, size: 46 }),
+          defaultLayer('weatherTemp', { x: 0.84, y: 0.48, size: 34, font: 'sans-light', weight: 'normal', color: '#ffffff', align: 'center', showUnit: false }),
+          defaultLayer('weatherCondition', { x: 0.94, y: 0.72, size: 12, font: 'sans-light', color: '#eef1fa', align: 'right' }),
+          defaultLayer('weatherRange', { x: 0.94, y: 0.86, size: 12, font: 'sans-light', color: '#cbd3ea', align: 'right' }),
+        ],
+      ),
+  },
+  {
+    key: 'minimal',
+    build: () =>
+      make('Минимализм', {}, [
+        defaultLayer('clockDigital', { x: 0.07, y: 0.42, size: 50, font: 'sans-thin', weight: 'normal' }),
+        defaultLayer('date', { x: 0.07, y: 0.79, size: 14, format: 'EEE, d MMM' }),
+        defaultLayer('weatherTemp', { x: 0.93, y: 0.42, size: 30, font: 'sans-light', align: 'right' }),
+        defaultLayer('weatherRange', { x: 0.93, y: 0.78, size: 13, align: 'right' }),
+      ]),
+  },
   {
     key: 'night',
     build: () =>
@@ -37,20 +73,6 @@ export const TEMPLATES: Template[] = [
       ),
   },
   {
-    key: 'analog',
-    build: () =>
-      make(
-        'Циферблат',
-        { bg: { type: 'gradient', c1: '#0f2027', c2: '#2c5364', angle: 160, radius: 28, opacity: 1 } },
-        [
-          defaultLayer('clockAnalog', { x: 0.2, y: 0.5, size: 92, face: '#ffffff', ring: '#e8e8e8', ringWidth: 3, tickColor: '#222222', hourColor: '#111111', minuteColor: '#111111', ticks: 'hours', opacity: 1 }),
-          defaultLayer('date', { x: 0.42, y: 0.34, size: 17, format: 'EEEE', align: 'left', color: '#ffffff', weight: 'bold' }),
-          defaultLayer('date', { x: 0.42, y: 0.56, size: 14, format: 'd MMMM', align: 'left', color: '#bcd3dc' }),
-          defaultLayer('weatherTemp', { x: 0.42, y: 0.8, size: 24, align: 'left', unit: 'C' }),
-        ],
-      ),
-  },
-  {
     key: 'sunset',
     build: () =>
       make(
@@ -68,9 +90,7 @@ export const TEMPLATES: Template[] = [
       make(
         'Крупное время',
         { cols: 4, rows: 2, bg: { type: 'solid', c1: '#000000', c2: '#000000', angle: 0, radius: 18, opacity: 0.85 } },
-        [
-          defaultLayer('clockDigital', { x: 0.5, y: 0.5, size: 72, align: 'center', font: 'condensed', weight: 'bold', color: '#ffffff', format: 'H:mm' }),
-        ],
+        [defaultLayer('clockDigital', { x: 0.5, y: 0.5, size: 72, align: 'center', font: 'condensed', weight: 'bold', color: '#ffffff', format: 'H:mm' })],
       ),
   },
   {

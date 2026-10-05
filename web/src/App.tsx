@@ -9,9 +9,9 @@ import { MinePanel } from './ui/MinePanel';
 import { WeatherPanel } from './ui/WeatherPanel';
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'layers', label: 'Слои' },
-  { id: 'bg', label: 'Фон' },
-  { id: 'templates', label: 'Шаблоны' },
+  { id: 'templates', label: 'Пресеты' },
+  { id: 'layers', label: 'Настроить' },
+  { id: 'bg', label: 'Внешний вид' },
   { id: 'mine', label: 'Мои' },
   { id: 'weather', label: 'Погода' },
 ];
@@ -39,13 +39,16 @@ export default function App() {
       <header className="top">
         <div className="brand">
           <span className="brand-mark" aria-hidden />
-          <span className="brand-name">Widgetly</span>
-          {info && !info.native && <span className="chip" title="Приложение открыто в браузере">браузер</span>}
+          <span>
+            <span className="brand-name">Widgetly</span>
+            <span className="brand-subtitle">Виджет за минуту</span>
+          </span>
+          {info && !info.native && <span className="chip">браузер</span>}
         </div>
         <div className="top-actions">
           <button type="button" onClick={undo} disabled={!canUndo} aria-label="Отменить">↶</button>
           <button type="button" onClick={redo} disabled={!canRedo} aria-label="Повторить">↷</button>
-          <button type="button" onClick={() => void save()} className={dirty ? 'primary' : ''}>Сохранить</button>
+          <button type="button" onClick={() => void save()} className={dirty ? 'primary' : ''}>{dirty ? 'Сохранить' : 'Сохранено'}</button>
           <button type="button" onClick={() => void pin()} className="accent">На экран</button>
         </div>
       </header>
@@ -60,9 +63,9 @@ export default function App() {
               </button>
             ))}
           </nav>
+          {tab === 'templates' && <TemplatesPanel />}
           {tab === 'layers' && <LayersPanel />}
           {tab === 'bg' && <BackgroundPanel />}
-          {tab === 'templates' && <TemplatesPanel />}
           {tab === 'mine' && <MinePanel />}
           {tab === 'weather' && <WeatherPanel />}
         </section>
