@@ -1,0 +1,7 @@
+app.clockweather.app-pngs-0 /workspace/app/build/generated/res/pngs/debug
+app.clockweather.app-resValues-1 /workspace/app/build/generated/res/resValues/debug
+app.clockweather.app-packageDebugResources-2 /workspace/app/build/intermediates/incremental/debug/packageDebugResources/merged.dir
+app.clockweather.app-packageDebugResources-3 /workspace/app/build/intermediates/incremental/debug/packageDebugResources/stripped.dir
+app.clockweather.app-debug-4 /workspace/app/build/intermediates/merged_res/debug/mergeDebugResources
+app.clockweather.app-debug-5 /workspace/app/src/debug/res
+app.clockweather.app-main-6 /workspace/app/src/main/res

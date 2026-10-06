@@ -1,0 +1,93 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="app.clockweather"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="26"
+9        android:targetSdkVersion="34" />
+10
+11    <uses-permission android:name="android.permission.INTERNET" />
+11-->/workspace/app/src/main/AndroidManifest.xml:3:5-67
+11-->/workspace/app/src/main/AndroidManifest.xml:3:22-64
+12    <uses-permission android:name="android.permission.READ_CALENDAR" />
+12-->/workspace/app/src/main/AndroidManifest.xml:4:5-72
+12-->/workspace/app/src/main/AndroidManifest.xml:4:22-69
+13    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+13-->/workspace/app/src/main/AndroidManifest.xml:5:5-81
+13-->/workspace/app/src/main/AndroidManifest.xml:5:22-78
+14
+15    <application
+15-->/workspace/app/src/main/AndroidManifest.xml:7:5-34:19
+16        android:allowBackup="false"
+16-->/workspace/app/src/main/AndroidManifest.xml:8:9-36
+17        android:debuggable="true"
+18        android:extractNativeLibs="false"
+19        android:icon="@mipmap/ic_launcher"
+19-->/workspace/app/src/main/AndroidManifest.xml:9:9-43
+20        android:label="@string/app_name"
+20-->/workspace/app/src/main/AndroidManifest.xml:11:9-41
+21        android:roundIcon="@mipmap/ic_launcher_round"
+21-->/workspace/app/src/main/AndroidManifest.xml:10:9-54
+22        android:theme="@style/Theme.App" >
+22-->/workspace/app/src/main/AndroidManifest.xml:12:9-41
+23        <activity
+23-->/workspace/app/src/main/AndroidManifest.xml:14:9-22:20
+24            android:name="app.clockweather.MainActivity"
+24-->/workspace/app/src/main/AndroidManifest.xml:14:19-47
+25            android:exported="true" >
+25-->/workspace/app/src/main/AndroidManifest.xml:14:48-71
+26            <intent-filter>
+26-->/workspace/app/src/main/AndroidManifest.xml:15:13-18:29
+27                <action android:name="android.intent.action.MAIN" />
+27-->/workspace/app/src/main/AndroidManifest.xml:16:17-69
+27-->/workspace/app/src/main/AndroidManifest.xml:16:25-66
+28
+29                <category android:name="android.intent.category.LAUNCHER" />
+29-->/workspace/app/src/main/AndroidManifest.xml:17:17-77
+29-->/workspace/app/src/main/AndroidManifest.xml:17:27-74
+30            </intent-filter>
+31            <intent-filter>
+31-->/workspace/app/src/main/AndroidManifest.xml:19:13-21:29
+32                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+32-->/workspace/app/src/main/AndroidManifest.xml:20:17-87
+32-->/workspace/app/src/main/AndroidManifest.xml:20:25-84
+33            </intent-filter>
+34        </activity>
+35
+36        <receiver
+36-->/workspace/app/src/main/AndroidManifest.xml:24:9-30:20
+37            android:name="app.clockweather.ClockWidget"
+37-->/workspace/app/src/main/AndroidManifest.xml:24:19-46
+38            android:exported="true" >
+38-->/workspace/app/src/main/AndroidManifest.xml:24:47-70
+39            <intent-filter>
+39-->/workspace/app/src/main/AndroidManifest.xml:25:13-28:29
+40                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+40-->/workspace/app/src/main/AndroidManifest.xml:26:17-84
+40-->/workspace/app/src/main/AndroidManifest.xml:26:25-81
+41                <action android:name="android.app.action.NEXT_ALARM_CLOCK_CHANGED" />
+41-->/workspace/app/src/main/AndroidManifest.xml:27:17-86
+41-->/workspace/app/src/main/AndroidManifest.xml:27:25-83
+42            </intent-filter>
+43
+44            <meta-data
+44-->/workspace/app/src/main/AndroidManifest.xml:29:13-104
+45                android:name="android.appwidget.provider"
+45-->/workspace/app/src/main/AndroidManifest.xml:29:24-65
+46                android:resource="@xml/widget_info" />
+46-->/workspace/app/src/main/AndroidManifest.xml:29:66-101
+47        </receiver>
+48
+49        <service
+49-->/workspace/app/src/main/AndroidManifest.xml:32:9-33:72
+50            android:name="app.clockweather.RefreshJob"
+50-->/workspace/app/src/main/AndroidManifest.xml:32:18-44
+51            android:exported="false"
+51-->/workspace/app/src/main/AndroidManifest.xml:32:45-69
+52            android:permission="android.permission.BIND_JOB_SERVICE" />
+52-->/workspace/app/src/main/AndroidManifest.xml:33:13-69
+53    </application>
+54
+55</manifest>

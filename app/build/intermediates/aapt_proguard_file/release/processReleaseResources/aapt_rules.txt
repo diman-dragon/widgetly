@@ -1,0 +1,3 @@
+-keep class app.clockweather.ClockWidget { <init>(); }
+-keep class app.clockweather.MainActivity { <init>(); }
+-keep class app.clockweather.RefreshJob { <init>(); }

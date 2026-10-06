@@ -2,34 +2,70 @@ package app.clockweather
 
 import android.content.SharedPreferences
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-class Fc(val name: String, val code: Int, val hi: Float, val lo: Float)
-class Wx(val city: String, val temp: Float, val code: Int, val day: Boolean, val hi: Float, val lo: Float, val fc: List<Fc>)
+/** Одна точка почасового прогноза: «15:00», 21°, код погоды. */
+class Hp(val time: String, val temp: Int, val code: Int)
 
+class Fc(val name: String, val code: Int, val hi: Float, val lo: Float)
+
+/** Погода + прогноз. [fc] — суточные ячейки (день/ночь), [hp] — почасовые точки для почерка. */
+class Wx(
+    val city: String, val temp: Float, val code: Int, val day: Boolean, val hi: Float, val lo: Float,
+    val fc: List<Fc>, val hp: List<Hp> = emptyList()
+)
+
+/**
+ * Чтение кэша из SharedPreferences.
+ *
+ * Энергоэффективность: разбор CSV и создание `SimpleDateFormat` раньше происходили на горячем
+ * пути — при каждой перерисовке виджета. Теперь разобранный результат кешируется в памяти и
+ * переиспользуется, пока не изменится сырая строка (`w_date`/`w_fc`) или язык системы.
+ */
 object Data {
-    val DEMO = Wx("Санкт-Петербург", 22f, 2, true, 23f, 14f, listOf(
-        Fc("ВТ", 2, 24f, 15f), Fc("СР", 61, 20f, 13f), Fc("ЧТ", 3, 21f, 14f),
-        Fc("ПТ", 2, 22f, 15f), Fc("СБ", 0, 25f, 16f), Fc("ВС", 2, 24f, 15f)))
-    const val DEMO_EV = "10:00 · Встреча\n14:30 · Звонок"
+    /** Демо-данные для предпросмотра: 3 дня по умолчанию. */
+    val DEMO = Demo.wx(3, 1, 5, 3)
+    const val DEMO_EV = Demo.EV
+
+    private val DAY_FMT = SimpleDateFormat("EEE", Locale.getDefault())
+    private var cacheKey = ""
+    private var cache: Wx? = null
 
     fun today(): String = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
 
+    /** Короткое имя дня недели («ВТ») для ячейки прогноза. */
+    fun shortName(ms: Long): String = DAY_FMT.format(Date(ms)).uppercase(Locale.getDefault())
+
+    /** Сырые данные поменялись — сбрасываем разобранный кэш. */
+    fun invalidate() { cacheKey = ""; cache = null }
+
     fun weather(p: SharedPreferences): Wx? {
         if (!p.contains("w_code")) return null
-        val fc = ArrayList<Fc>()
+        val key = "${p.getString("w_date", "")}#${p.getFloat("w_temp", 0f)}#${Locale.getDefault().language}"
+        val hit = cache
+        if (hit != null && cacheKey == key) return hit
+
         val ds = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        val dn = SimpleDateFormat("EEE", Locale.getDefault())
+        val fc = ArrayList<Fc>()
         for (s in (p.getString("w_fc", "") ?: "").split(';')) {
             val a = s.split('|')
             if (a.size != 4) continue
             val d = try { ds.parse(a[0]) } catch (_: Exception) { null }
-            fc.add(Fc(if (d == null) "" else dn.format(d).uppercase(), a[1].toIntOrNull() ?: 0,
+            fc.add(Fc(if (d == null) "" else shortName(d.time), a[1].toIntOrNull() ?: 0,
                 a[2].toFloatOrNull() ?: 0f, a[3].toFloatOrNull() ?: 0f))
         }
-        return Wx(p.getString("city", null) ?: "Укажите город", p.getFloat("w_temp", 0f), p.getInt("w_code", 0),
-            p.getInt("w_day", 1) == 1, p.getFloat("w_hi", 0f), p.getFloat("w_lo", 0f), fc)
+        val hp = ArrayList<Hp>()
+        for (s in (p.getString("w_hr", "") ?: "").split(';')) {
+            val a = s.split('|')
+            if (a.size != 3) continue
+            hp.add(Hp(a[0], a[1].toIntOrNull() ?: 0, a[2].toIntOrNull() ?: 0))
+        }
+        val w = Wx(p.getString("city", null) ?: "Укажите город", p.getFloat("w_temp", 0f), p.getInt("w_code", 0),
+            p.getInt("w_day", 1) == 1, p.getFloat("w_hi", 0f), p.getFloat("w_lo", 0f), fc, hp)
+        cache = w; cacheKey = key
+        return w
     }
 
     fun emoji(code: Int, day: Boolean) = when (code) {
@@ -65,4 +101,9 @@ object Data {
         }
         return if (ru) a else b
     }
+
+    /** Полночь сегодня — старт отсчёта почасовых точек. */
+    fun startOfToday(): Long = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
 }

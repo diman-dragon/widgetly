@@ -1,0 +1,101 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /workspace/app/src/main/AndroidManifest.xml:2:1-35:12
+INJECTED from /workspace/app/src/main/AndroidManifest.xml:2:1-35:12
+INJECTED from /workspace/app/src/main/AndroidManifest.xml:2:1-35:12
+INJECTED from /workspace/app/src/main/AndroidManifest.xml:2:1-35:12
+	package
+		INJECTED from /workspace/app/src/main/AndroidManifest.xml
+	android:versionName
+		INJECTED from /workspace/app/src/main/AndroidManifest.xml
+	android:versionCode
+		INJECTED from /workspace/app/src/main/AndroidManifest.xml
+	xmlns:android
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:2:11-69
+uses-permission#android.permission.INTERNET
+ADDED from /workspace/app/src/main/AndroidManifest.xml:3:5-67
+	android:name
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:3:22-64
+uses-permission#android.permission.READ_CALENDAR
+ADDED from /workspace/app/src/main/AndroidManifest.xml:4:5-72
+	android:name
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:4:22-69
+uses-permission#android.permission.RECEIVE_BOOT_COMPLETED
+ADDED from /workspace/app/src/main/AndroidManifest.xml:5:5-81
+	android:name
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:5:22-78
+application
+ADDED from /workspace/app/src/main/AndroidManifest.xml:7:5-34:19
+INJECTED from /workspace/app/src/main/AndroidManifest.xml:7:5-34:19
+	android:extractNativeLibs
+		INJECTED from /workspace/app/src/main/AndroidManifest.xml
+	android:label
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:11:9-41
+	android:roundIcon
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:10:9-54
+	android:icon
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:9:9-43
+	android:allowBackup
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:8:9-36
+	android:theme
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:12:9-41
+activity#app.clockweather.MainActivity
+ADDED from /workspace/app/src/main/AndroidManifest.xml:14:9-22:20
+	android:exported
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:14:48-71
+	android:name
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:14:19-47
+intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
+ADDED from /workspace/app/src/main/AndroidManifest.xml:15:13-18:29
+action#android.intent.action.MAIN
+ADDED from /workspace/app/src/main/AndroidManifest.xml:16:17-69
+	android:name
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:16:25-66
+category#android.intent.category.LAUNCHER
+ADDED from /workspace/app/src/main/AndroidManifest.xml:17:17-77
+	android:name
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:17:27-74
+intent-filter#action:name:android.appwidget.action.APPWIDGET_CONFIGURE
+ADDED from /workspace/app/src/main/AndroidManifest.xml:19:13-21:29
+action#android.appwidget.action.APPWIDGET_CONFIGURE
+ADDED from /workspace/app/src/main/AndroidManifest.xml:20:17-87
+	android:name
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:20:25-84
+receiver#app.clockweather.ClockWidget
+ADDED from /workspace/app/src/main/AndroidManifest.xml:24:9-30:20
+	android:exported
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:24:47-70
+	android:name
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:24:19-46
+intent-filter#action:name:android.app.action.NEXT_ALARM_CLOCK_CHANGED+action:name:android.appwidget.action.APPWIDGET_UPDATE
+ADDED from /workspace/app/src/main/AndroidManifest.xml:25:13-28:29
+action#android.appwidget.action.APPWIDGET_UPDATE
+ADDED from /workspace/app/src/main/AndroidManifest.xml:26:17-84
+	android:name
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:26:25-81
+action#android.app.action.NEXT_ALARM_CLOCK_CHANGED
+ADDED from /workspace/app/src/main/AndroidManifest.xml:27:17-86
+	android:name
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:27:25-83
+meta-data#android.appwidget.provider
+ADDED from /workspace/app/src/main/AndroidManifest.xml:29:13-104
+	android:resource
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:29:66-101
+	android:name
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:29:24-65
+service#app.clockweather.RefreshJob
+ADDED from /workspace/app/src/main/AndroidManifest.xml:32:9-33:72
+	android:exported
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:32:45-69
+	android:permission
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:33:13-69
+	android:name
+		ADDED from /workspace/app/src/main/AndroidManifest.xml:32:18-44
+uses-sdk
+INJECTED from /workspace/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /workspace/app/src/main/AndroidManifest.xml
+INJECTED from /workspace/app/src/main/AndroidManifest.xml
+	android:targetSdkVersion
+		INJECTED from /workspace/app/src/main/AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from /workspace/app/src/main/AndroidManifest.xml

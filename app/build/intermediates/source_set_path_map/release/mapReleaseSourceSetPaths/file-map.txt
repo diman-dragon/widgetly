@@ -1,0 +1,8 @@
+app.clockweather.app-pngs-0 /workspace/app/build/generated/res/pngs/release
+app.clockweather.app-resValues-1 /workspace/app/build/generated/res/resValues/release
+app.clockweather.app-packageReleaseResources-2 /workspace/app/build/intermediates/incremental/release/packageReleaseResources/merged.dir
+app.clockweather.app-packageReleaseResources-3 /workspace/app/build/intermediates/incremental/release/packageReleaseResources/stripped.dir
+app.clockweather.app-merged-not-compiled-resources-4 /workspace/app/build/intermediates/merged-not-compiled-resources/release
+app.clockweather.app-release-5 /workspace/app/build/intermediates/merged_res/release/mergeReleaseResources
+app.clockweather.app-main-6 /workspace/app/src/main/res
+app.clockweather.app-release-7 /workspace/app/src/release/res
