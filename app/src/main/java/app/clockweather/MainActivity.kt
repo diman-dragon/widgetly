@@ -3,72 +3,58 @@ package app.clockweather
 import android.Manifest
 import android.app.Activity
 import android.appwidget.AppWidgetManager
-import android.content.Context
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.*
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-
-/** Две страницы со снапом: 0 = пресеты, 1 = тонкая настройка. */
-class Pager(c: Context, private val onPage: (Int) -> Unit) : HorizontalScrollView(c) {
-    private var flung = false
-    init { isHorizontalScrollBarEnabled = false; overScrollMode = OVER_SCROLL_NEVER; isFillViewport = true }
-
-    private fun near() = if (width > 0 && scrollX > width / 2) 1 else 0
-    fun go(p: Int) = smoothScrollTo(p * width, 0)
-
-    override fun fling(v: Int) { flung = true; go(if (v > 500) 1 else if (v < -500) 0 else near()) }
-
-    override fun onTouchEvent(e: MotionEvent): Boolean {
-        if (e.action == MotionEvent.ACTION_DOWN) flung = false
-        val r = super.onTouchEvent(e)
-        if ((e.action == MotionEvent.ACTION_UP || e.action == MotionEvent.ACTION_CANCEL) && !flung) go(near())
-        return r
-    }
-
-    override fun onScrollChanged(l: Int, t: Int, ol: Int, ot: Int) {
-        super.onScrollChanged(l, t, ol, ot); onPage(near())
-    }
-}
 
 class MainActivity : Activity() {
     private var cfg = Cfg()
+    private var preset = ""
+    private var isConfig = false
     private var dens = 1f
-    private lateinit var holder: FrameLayout
-    private var scroll: ScrollView? = null
+    private lateinit var status: TextView
+    private lateinit var holder1: FrameLayout
+    private lateinit var holder2: FrameLayout
+    private lateinit var pvFrame: FrameLayout
+    private var scroll1: ScrollView? = null
+    private var scroll2: ScrollView? = null
+    private var dirty1 = false
+    private var pvCols = 5
+    private var pvRows = 3
+    private val chips = ArrayList<TextView>()
 
     private val BG = 0xFF121317.toInt()
     private val ACCENT = 0xFF4FC3F7.toInt()
     private val TXT = 0xFFFFFFFF.toInt()
     private val PAL = intArrayOf(0xFFFFFFFF.toInt(), 0xFF000000.toInt(), 0xFFFFC83D.toInt(), 0xFFFF5A5F.toInt(),
         0xFF4FC3F7.toInt(), 0xFF81C784.toInt(), 0xFFBA68C8.toInt(), 0xFFFF8A3D.toInt())
+    private val SIZES = listOf(Triple("5×3", 5, 3), Triple("4×2", 4, 2), Triple("4×1", 4, 1), Triple("2×2", 2, 2))
 
     private fun dp(v: Int) = (v * dens).toInt()
 
     override fun onCreate(s: Bundle?) {
         super.onCreate(s)
         dens = resources.displayMetrics.density
-        // запуск как экран настройки при добавлении виджета
         val wid = intent?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 0) ?: 0
-        if (wid != 0) setResult(RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, wid))
-
+        if (wid != 0) {
+            isConfig = true
+            setResult(RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, wid))
+        }
         cfg = Cfg.load(this)
+        preset = Store.p(this).getString("preset", PRESETS[0].first) ?: PRESETS[0].first
         RefreshJob.schedule(this)
-        Refresh.async(this, false, null) // «при открытии»: обновит, только если данные старше ~20 ч
+        Refresh.async(this, false, null) // «при открытии»: обновит, только если сегодня ещё не обновляли
 
         val sp = Store.p(this)
-        if (cfg.eventsOn && !sp.getBoolean("asked", false) &&
-            checkSelfPermission(Manifest.permission.READ_CALENDAR) != PackageManager.PERMISSION_GRANTED) {
+        if (cfg.eventsOn && !sp.getBoolean("asked", false) && !calendarGranted()) {
             sp.edit().putBoolean("asked", true).apply()
             requestPermissions(arrayOf(Manifest.permission.READ_CALENDAR), 1)
         }
@@ -81,7 +67,10 @@ class MainActivity : Activity() {
                 setOnClickListener { pager.go(i) }
             })
         }
-        pager = Pager(this) { p -> for (i in 0..1) tabs[i].alpha = if (i == p) 1f else .45f }
+        pager = Pager(this) { p ->
+            for (i in 0..1) tabs[i].alpha = if (i == p) 1f else .45f
+            if (p == 0 && dirty1) rebuildPresets()
+        }
         tabs[1].alpha = .45f
 
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(BG) }
@@ -91,93 +80,179 @@ class MainActivity : Activity() {
 
         val w = resources.displayMetrics.widthPixels
         val row = LinearLayout(this)
-        row.addView(presetsPage(), LinearLayout.LayoutParams(w, MATCH_PARENT))
-        holder = FrameLayout(this)
-        buildSettings().also { scroll = it; holder.addView(it) }
-        row.addView(holder, LinearLayout.LayoutParams(w, MATCH_PARENT))
+        holder1 = FrameLayout(this)
+        row.addView(holder1, LinearLayout.LayoutParams(w, MATCH_PARENT))
+        row.addView(settingsPage(), LinearLayout.LayoutParams(w, MATCH_PARENT))
         pager.addView(row, FrameLayout.LayoutParams(WRAP_CONTENT, MATCH_PARENT))
         root.addView(pager, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
+
+        // нижняя панель: явный статус сохранения + «Готово»
+        val bottom = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL; setPadding(dp(16), dp(8), dp(8), dp(8)); setBackgroundColor(0xFF1C1E24.toInt())
+        }
+        status = tv("", 12f, 0xCCFFFFFF.toInt())
+        bottom.addView(status, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+        bottom.addView(Button(this).apply {
+            text = "Готово"
+            setOnClickListener { ClockWidget.renderAll(this@MainActivity); finish() }
+        })
+        root.addView(bottom)
         setContentView(root)
+
+        rebuildPresets()
+        updateStatus(false)
     }
 
     override fun onStop() { super.onStop(); ClockWidget.renderAll(this) }
 
     override fun onRequestPermissionsResult(rc: Int, perms: Array<out String>, res: IntArray) {
         super.onRequestPermissionsResult(rc, perms, res)
-        if (res.isNotEmpty() && res[0] == PackageManager.PERMISSION_GRANTED) Refresh.async(this, true, null)
+        if (res.isNotEmpty() && res[0] == PackageManager.PERMISSION_GRANTED) {
+            Refresh.async(this, true, null); rebuildSettings()
+        }
     }
 
-    private fun commit() { cfg.save(this); ClockWidget.renderAll(this) }
+    private fun calendarGranted() = checkSelfPermission(Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
 
-    private fun rebuild() {
-        val y = scroll?.scrollY ?: 0
-        holder.removeAllViews()
-        val s = buildSettings(); scroll = s; holder.addView(s)
+    // ---------- сохранение и обратная связь ----------
+
+    private fun commit() {
+        cfg.save(this); ClockWidget.renderAll(this)
+        dirty1 = true
+        refreshPreview(); updateStatus(true)
+    }
+
+    private fun styleName(): String {
+        val p = PRESETS.firstOrNull { it.first == preset } ?: return "Свой стиль"
+        return if (p.second == cfg) p.first else "Свой стиль (на основе ${p.first})"
+    }
+
+    private fun updateStatus(saved: Boolean) {
+        val n = AppWidgetManager.getInstance(this).getAppWidgetIds(ComponentName(this, ClockWidget::class.java)).size
+        val onScreen = if (n > 0) "виджетов на экране: $n" else if (isConfig) "виджет добавится после «Готово»" else "виджет ещё не добавлен на рабочий стол"
+        status.text = (if (saved) "✓ Сохранено и применено\n" else "Изменения сохраняются сразу\n") + styleName() + " · " + onScreen
+    }
+
+    // ---------- предпросмотр: тот же код, что рисует настоящий виджет ----------
+
+    private fun wallpaper() = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+        intArrayOf(0xFF614385.toInt(), 0xFF516395.toInt())).apply { cornerRadius = dp(20).toFloat() }
+
+    private fun addPreview(frame: FrameLayout, c: Cfg, cols: Int, rows: Int, mode: Int) {
+        frame.removeAllViews()
+        val wd = cols * 70 - 30; val hd = rows * 70 - 30
+        try {
+            val v = ClockWidget.build(this, c, wd, hd, mode).apply(applicationContext, frame)
+            frame.addView(v, FrameLayout.LayoutParams(dp(wd), dp(hd), Gravity.CENTER))
+        } catch (e: Exception) {
+            frame.addView(tv("Не удалось нарисовать предпросмотр", 12f, TXT))
+        }
+    }
+
+    private fun refreshPreview() = addPreview(pvFrame, cfg, pvCols, pvRows, 1)
+
+    // ---------- страница 1: пресеты (живые образцы) ----------
+
+    private fun rebuildPresets() {
+        val y = scroll1?.scrollY ?: 0
+        dirty1 = false
+        holder1.removeAllViews()
+        val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(8), dp(16), dp(24)) }
+        col.addView(tv("Нажмите на стиль — он сразу сохранится и применится к виджету. Настройка деталей — следующая страница (свайп).",
+            13f, 0xAAFFFFFF.toInt()))
+        PRESETS.forEach { (n, c) ->
+            col.addView(card(n, c), LinearLayout.LayoutParams(MATCH_PARENT, dp(196)).apply { topMargin = dp(12) })
+        }
+        val s = ScrollView(this).apply { addView(col) }
+        scroll1 = s; holder1.addView(s)
         s.post { s.scrollY = y }
     }
 
-    private fun tv(t: String, sp: Float, col: Int) = TextView(this).apply { text = t; textSize = sp; setTextColor(col) }
-
-    // ---------------- Страница 1: пресеты ----------------
-
-    private fun presetsPage(): View {
-        val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(8), dp(16), dp(24)) }
-        col.addView(tv("Выберите стиль. Тонкая настройка — свайпом на соседнюю страницу.", 14f, 0xAAFFFFFF.toInt()))
-        PRESETS.forEach { (n, c) ->
-            col.addView(card(n, c), LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(12) })
-        }
-        return ScrollView(this).apply { addView(col) }
-    }
-
     private fun card(name: String, c: Cfg): View {
-        val inner = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(10), dp(16), dp(12))
-            background = GradientDrawable().apply { setColor(c.bgColor); alpha = c.bgAlpha * 255 / 100; cornerRadius = dp(20).toFloat() }
-        }
-        inner.addView(tv("10:09", c.size * 0.55f, c.clockColor).apply {
-            typeface = Typeface.create(FONT_FAMILY[c.font], Typeface.NORMAL)
-        })
-        val line = LinearLayout(this)
-        if (c.dateOn) line.addView(tv(SimpleDateFormat(DATE_FMT[c.dateFmt], Locale.getDefault()).format(Date()), 14f, c.dateColor))
-        if (c.alarmOn) line.addView(tv("   ⏰ 07:30", 13f, c.alarmColor))
-        if (c.weatherOn) line.addView(tv("   ⛅ 18°", 14f, c.weatherColor))
-        inner.addView(line)
-        if (c.eventsOn) inner.addView(tv("10:00 · Встреча", 12f, c.eventsColor))
-
+        val sel = cfg == c
         val f = FrameLayout(this).apply {
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                intArrayOf(0xFF614385.toInt(), 0xFF516395.toInt())).apply { cornerRadius = dp(20).toFloat() }
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            background = wallpaper().apply { if (sel) setStroke(dp(3), ACCENT) }
         }
-        f.addView(inner, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-        f.addView(tv(name, 11f, 0xCCFFFFFF.toInt()).apply { setPadding(dp(10), dp(4), dp(10), dp(6)) },
-            FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.END or Gravity.BOTTOM))
+        val pv = FrameLayout(this)
+        f.addView(pv, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        addPreview(pv, c, 5, 3, 2)
+        f.addView(tv(if (sel) "✓ $name · выбран" else name, 11f, 0xFFFFFFFF.toInt()).apply {
+            setPadding(dp(8), dp(2), dp(8), dp(3))
+            background = GradientDrawable().apply { setColor(if (sel) 0xFF1B8FB8.toInt() else 0x99000000.toInt()); cornerRadius = dp(10).toFloat() }
+        }, FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.START or Gravity.TOP))
         f.setOnClickListener {
-            cfg = c; commit(); rebuild()
-            Toast.makeText(this, name, Toast.LENGTH_SHORT).show()
+            cfg = c; preset = name
+            Store.p(this).edit().putString("preset", name).apply()
+            commit(); rebuildPresets(); rebuildSettings()
+            Toast.makeText(this, "Сохранено: $name", Toast.LENGTH_SHORT).show()
         }
         return f
     }
 
-    // ---------------- Страница 2: настройки ----------------
+    // ---------- страница 2: настройки с предпросмотром сверху ----------
+
+    private fun settingsPage(): View {
+        val page = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        pvFrame = FrameLayout(this).apply { setPadding(dp(8), dp(8), dp(8), dp(8)); background = wallpaper() }
+        page.addView(pvFrame, LinearLayout.LayoutParams(MATCH_PARENT, dp(196)).apply { setMargins(dp(16), dp(8), dp(16), 0) })
+
+        val chipRow = LinearLayout(this).apply { gravity = Gravity.CENTER; setPadding(0, dp(6), 0, dp(2)) }
+        SIZES.forEachIndexed { i, (label, c, r) ->
+            val t = tv(label, 13f, TXT).apply {
+                gravity = Gravity.CENTER; setPadding(dp(14), dp(6), dp(14), dp(6))
+                setOnClickListener { pvCols = c; pvRows = r; paintChips(); refreshPreview() }
+            }
+            chips.add(t); chipRow.addView(t)
+        }
+        page.addView(tv("Размер виджета на экране:", 11f, 0x88FFFFFF.toInt()).apply { gravity = Gravity.CENTER })
+        page.addView(chipRow)
+        paintChips()
+
+        holder2 = FrameLayout(this)
+        page.addView(holder2, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
+        rebuildSettings()
+        refreshPreview()
+        return page
+    }
+
+    private fun paintChips() {
+        chips.forEachIndexed { i, t ->
+            val on = SIZES[i].second == pvCols && SIZES[i].third == pvRows
+            t.background = GradientDrawable().apply { setColor(if (on) 0xFF1B8FB8.toInt() else 0x22FFFFFF); cornerRadius = dp(14).toFloat() }
+        }
+    }
+
+    private fun rebuildSettings() {
+        val y = scroll2?.scrollY ?: 0
+        holder2.removeAllViews()
+        val s = buildSettings(); scroll2 = s; holder2.addView(s)
+        s.post { s.scrollY = y }
+    }
 
     private fun buildSettings(): ScrollView {
         val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(4), dp(16), dp(32)) }
 
+        col.title("РАСКЛАДКА И ФОН")
+        col.spin(LAYOUT_NAMES, cfg.layout) { cfg = cfg.copy(layout = it); commit() }
+        col.spin(SCENE_NAMES, cfg.scene) { cfg = cfg.copy(scene = it); commit() }
+        col.seek("Прозрачность, %", 100 - cfg.bgAlpha, 0, 100) { cfg = cfg.copy(bgAlpha = 100 - it); commit() }
+        col.colors(cfg.bgColor) { cfg = cfg.copy(bgColor = it); commit(); rebuildSettings() }
+
         col.title("ЧАСЫ")
         col.spin(FONT_NAMES, cfg.font) { cfg = cfg.copy(font = it); commit() }
         col.seek("Размер", cfg.size, 36, 80) { cfg = cfg.copy(size = it); commit() }
-        col.colors(cfg.clockColor) { cfg = cfg.copy(clockColor = it); commit(); rebuild() }
+        col.colors(cfg.clockColor) { cfg = cfg.copy(clockColor = it); commit(); rebuildSettings() }
         col.sw("24-часовой формат", cfg.h24) { cfg = cfg.copy(h24 = it); commit() }
 
         col.title("ДАТА")
         col.sw("Показывать", cfg.dateOn) { cfg = cfg.copy(dateOn = it); commit() }
-        col.spin(arrayOf("Вт, 6 окт", "Вторник, 6 октября", "6 октября"), cfg.dateFmt) { cfg = cfg.copy(dateFmt = it); commit() }
-        col.colors(cfg.dateColor) { cfg = cfg.copy(dateColor = it); commit(); rebuild() }
+        col.spin(arrayOf("Короткая", "Полная", "Только число и месяц"), cfg.dateFmt) { cfg = cfg.copy(dateFmt = it); commit() }
+        col.colors(cfg.dateColor) { cfg = cfg.copy(dateColor = it); commit(); rebuildSettings() }
 
         col.title("БУДИЛЬНИК")
         col.sw("Показывать следующий", cfg.alarmOn) { cfg = cfg.copy(alarmOn = it); commit() }
-        col.colors(cfg.alarmColor) { cfg = cfg.copy(alarmColor = it); commit(); rebuild() }
+        col.colors(cfg.alarmColor) { cfg = cfg.copy(alarmColor = it); commit(); rebuildSettings() }
 
         col.title("ПОГОДА И ГОРОД")
         col.sw("Показывать", cfg.weatherOn) { cfg = cfg.copy(weatherOn = it); commit() }
@@ -189,20 +264,20 @@ class MainActivity : Activity() {
         val cityRow = LinearLayout(this)
         cityRow.addView(et, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f)); cityRow.addView(btn)
         col.addView(cityRow)
+        col.sw("Прогноз на 6 дней (при достаточном размере)", cfg.forecastOn) { cfg = cfg.copy(forecastOn = it); commit() }
         col.sw("Градусы Фаренгейта", cfg.fahr) { cfg = cfg.copy(fahr = it); commit() }
-        col.colors(cfg.weatherColor) { cfg = cfg.copy(weatherColor = it); commit(); rebuild() }
+        col.colors(cfg.weatherColor) { cfg = cfg.copy(weatherColor = it); commit(); rebuildSettings() }
 
         col.title("СОБЫТИЯ КАЛЕНДАРЯ")
         col.sw("Показывать ближайшие", cfg.eventsOn) {
             cfg = cfg.copy(eventsOn = it); commit()
-            if (it && checkSelfPermission(Manifest.permission.READ_CALENDAR) != PackageManager.PERMISSION_GRANTED)
-                requestPermissions(arrayOf(Manifest.permission.READ_CALENDAR), 1)
+            if (it && !calendarGranted()) requestPermissions(arrayOf(Manifest.permission.READ_CALENDAR), 1)
         }
-        col.colors(cfg.eventsColor) { cfg = cfg.copy(eventsColor = it); commit(); rebuild() }
-
-        col.title("ФОН")
-        col.seek("Прозрачность, %", 100 - cfg.bgAlpha, 0, 100) { cfg = cfg.copy(bgAlpha = 100 - it); commit() }
-        col.colors(cfg.bgColor) { cfg = cfg.copy(bgColor = it); commit(); rebuild() }
+        if (!calendarGranted()) col.addView(Button(this).apply {
+            text = "Разрешить доступ к календарю"
+            setOnClickListener { requestPermissions(arrayOf(Manifest.permission.READ_CALENDAR), 1) }
+        })
+        col.colors(cfg.eventsColor) { cfg = cfg.copy(eventsColor = it); commit(); rebuildSettings() }
 
         col.addView(tv("Погода и календарь обновляются раз в сутки. Тап по погоде на виджете — обновить вручную.",
             12f, 0x88FFFFFF.toInt()).apply { setPadding(0, dp(24), 0, 0) })
@@ -215,11 +290,16 @@ class MainActivity : Activity() {
         Thread {
             val name = Refresh.geocode(a, q)
             if (name != null) Refresh.run(a, true)
-            runOnUiThread { Toast.makeText(this, if (name != null) "Город: $name" else "Не найдено или нет сети", Toast.LENGTH_SHORT).show() }
+            runOnUiThread {
+                Toast.makeText(this, if (name != null) "Город: $name" else "Не найдено или нет сети", Toast.LENGTH_SHORT).show()
+                refreshPreview(); updateStatus(name != null)
+            }
         }.start()
     }
 
-    // ---------------- Мини-конструкторы контролов ----------------
+    private fun tv(t: String, sp: Float, col: Int) = TextView(this).apply { text = t; textSize = sp; setTextColor(col) }
+
+    // ---------- мини-конструкторы контролов ----------
 
     private fun LinearLayout.title(t: String) = addView(tv(t, 13f, ACCENT).apply {
         typeface = Typeface.DEFAULT_BOLD; setPadding(0, dp(22), 0, dp(6))

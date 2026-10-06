@@ -23,7 +23,8 @@ object Refresh {
 
     fun stale(c: Context): Boolean {
         val p = Store.p(c); val n = System.currentTimeMillis()
-        return (p.contains("lat") && n - p.getLong("w_t", 0) > 20 * H) || n - p.getLong("e_t", 0) > 20 * H
+        val t = Data.today()
+        return (p.contains("lat") && p.getString("w_date", "") != t) || p.getString("e_date", "") != t
     }
 
     fun async(c: Context, force: Boolean, pr: android.content.BroadcastReceiver.PendingResult?) {
@@ -35,11 +36,12 @@ object Refresh {
         synchronized(lock) {
             val p = Store.p(c); val n = System.currentTimeMillis()
             val gap = if (force) 60_000L else 30 * 60_000L
-            if ((force || n - p.getLong("w_t", 0) > 20 * H) && n - p.getLong("w_try", 0) > gap) {
+            val t = Data.today()
+            if ((force || p.getString("w_date", "") != t) && n - p.getLong("w_try", 0) > gap) {
                 p.edit().putLong("w_try", n).apply()
                 weather(p)
             }
-            if (force || n - p.getLong("e_t", 0) > 20 * H) events(c, p)
+            if (force || p.getString("e_date", "") != t) events(c, p)
             ClockWidget.renderAll(c)
         }
     }
@@ -54,11 +56,23 @@ object Refresh {
         if (!p.contains("lat")) return
         try {
             val u = "https://api.open-meteo.com/v1/forecast?latitude=${p.getFloat("lat", 0f)}" +
-                "&longitude=${p.getFloat("lon", 0f)}&current=temperature_2m,weather_code,is_day&timezone=auto"
-            val j = JSONObject(get(u)).getJSONObject("current")
+                "&longitude=${p.getFloat("lon", 0f)}&current=temperature_2m,weather_code,is_day" +
+                "&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=7&timezone=auto"
+            val root = JSONObject(get(u))
+            val j = root.getJSONObject("current")
+            val d = root.getJSONObject("daily")
+            val t = d.getJSONArray("time"); val wc = d.getJSONArray("weather_code")
+            val mx = d.getJSONArray("temperature_2m_max"); val mn = d.getJSONArray("temperature_2m_min")
+            val sb = StringBuilder()
+            for (i in 1 until minOf(t.length(), 7)) {
+                if (i > 1) sb.append(';')
+                sb.append(t.getString(i)).append('|').append(wc.getInt(i)).append('|')
+                    .append(mx.getDouble(i)).append('|').append(mn.getDouble(i))
+            }
             p.edit().putFloat("w_temp", j.getDouble("temperature_2m").toFloat())
                 .putInt("w_code", j.getInt("weather_code")).putInt("w_day", j.getInt("is_day"))
-                .putLong("w_t", System.currentTimeMillis()).apply()
+                .putFloat("w_hi", mx.getDouble(0).toFloat()).putFloat("w_lo", mn.getDouble(0).toFloat())
+                .putString("w_fc", sb.toString()).putString("w_date", Data.today()).apply()
         } catch (_: Exception) { }
     }
 
@@ -71,7 +85,7 @@ object Refresh {
             val name = r.getString("name")
             Store.p(c).edit().putFloat("lat", r.getDouble("latitude").toFloat())
                 .putFloat("lon", r.getDouble("longitude").toFloat())
-                .putString("city", name).putLong("w_t", 0).putLong("w_try", 0).apply()
+                .putString("city", name).putString("w_date", "").putLong("w_try", 0).apply()
             name
         }
     } catch (_: Exception) { null }
@@ -82,7 +96,7 @@ object Refresh {
             try {
                 val now = System.currentTimeMillis()
                 val b = CalendarContract.Instances.CONTENT_URI.buildUpon()
-                ContentUris.appendId(b, now); ContentUris.appendId(b, now + 36 * H)
+                ContentUris.appendId(b, now); ContentUris.appendId(b, now + 7 * 24 * H)
                 val proj = arrayOf(CalendarContract.Instances.TITLE, CalendarContract.Instances.BEGIN,
                     CalendarContract.Instances.ALL_DAY)
                 val day = SimpleDateFormat("EEE", Locale.getDefault())
@@ -102,6 +116,6 @@ object Refresh {
                 }
             } catch (_: Exception) { }
         }
-        p.edit().putString("ev", out.toString()).putLong("e_t", System.currentTimeMillis()).apply()
+        p.edit().putString("ev", out.toString()).putString("e_date", Data.today()).apply()
     }
 }
