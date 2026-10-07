@@ -13,7 +13,7 @@ export const isLeaf = (n:Node):n is Leaf => n.kind==='leaf'
 export const find = (n:Node, target:string):Node|null => n.id===target?n:(n.kind==='split'?(find(n.first,target)??find(n.second,target)):null)
 export const update = (n:Node,target:string,fn:(n:Node)=>Node):Node => n.id===target?fn(n):n.kind==='split'?{...n,first:update(n.first,target,fn),second:update(n.second,target,fn)}:n
 export const split = (root:Node,target:string,direction:Direction,newWidgetId:string|null=null):Node => update(root,target,n=>isLeaf(n)?{id:id('split'),kind:'split',direction,ratio:.5,first:n,second:leaf(newWidgetId)}:n)
-export const setRatio = (root:Node,target:string,ratio:number):Node => update(root,target,n=>n.kind==='split'?{...n,ratio:Math.max(.12,Math.min(.88,ratio))}:n)
+export const setRatio = (root:Node,target:string,ratio:number):Node => update(root,target,n=>n.kind==='split'?{...n,ratio:Number.isFinite(ratio)?Math.max(.12,Math.min(.88,ratio)):n.ratio}:n)
 export const remove = (root:Node,target:string):Node => { if(root.id===target)return root; if(root.kind!=='split')return root; if(root.first.id===target)return root.second;if(root.second.id===target)return root.first;return {...root,first:remove(root.first,target),second:remove(root.second,target)} }
 export const firstLeaf = (n:Node):Leaf => isLeaf(n)?n:firstLeaf(n.first)
 export const collect = (n:Node,out:string[]=[]):string[] => {if(isLeaf(n)){if(n.widgetId)out.push(n.widgetId);return out}collect(n.first,out);return collect(n.second,out)}

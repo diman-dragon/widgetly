@@ -12,6 +12,12 @@ function statSafe(p){try{statSync(p);return true}catch{return false}}
 function walk(dir){let out=[];for(const e of readdirSync(dir,{withFileTypes:true})){const p=join(dir,e.name);if(e.isDirectory())out.push(...walk(p));else out.push(p)}return out}
 
 
+test('capacitor android platform dependency is present and aligned',()=>{
+ const android=pkg.dependencies?.['@capacitor/android']
+ assert.ok(android,'@capacitor/android dependency is required for npx cap add android')
+ assert.equal(android,pkg.dependencies?.['@capacitor/core'])
+ assert.equal(pkg.devDependencies?.['@capacitor/cli'],android)
+})
 test('github workflow does not require a lock-file cache',()=>{
  const workflow=readFileSync(join(root,'.github/workflows/android-debug.yml'),'utf8')
  assert.doesNotMatch(workflow,/cache:\s*npm/)
