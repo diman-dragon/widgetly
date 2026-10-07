@@ -1,31 +1,24 @@
-# Widget Editor — Clean Edition
+# Widgetly
 
-Простой визуальный редактор информационного экрана.
+Визуальный редактор информационного экрана. Работает в браузере и как Android-приложение (Capacitor).
 
-## Что видит пользователь
-- каталог виджетов;
-- рабочее пространство с областями;
-- разделение областей по горизонтали и вертикали;
-- изменение размеров разделителей;
-- drag & drop виджетов;
-- настройки выбранного виджета;
-- Undo / Redo;
-- дублирование и удаление областей;
-- полноэкранный просмотр.
+## Возможности
+- каталог из 8 виджетов: часы, погода, календарь, события, уведомления, текст, показатель, мировое время;
+- рабочее пространство из областей: деление «сверху/снизу» и «слева/справа», изменение размеров перетаскиванием разделителей (на клавиатуре — стрелками);
+- drag & drop из каталога и между областями; на телефоне — выбор из списка «Виджеты» и нажатие на область;
+- настройки виджета: размер, прозрачность, выравнивание, акцентный цвет и поля конкретного виджета;
+- Undo / Redo (Ctrl+Z, Ctrl+Shift+Z / Ctrl+Y), правки ползунков и текста объединяются в один шаг;
+- дублирование и удаление областей (Delete), сброс к шаблону;
+- режим просмотра на весь экран: панель управления прячется и появляется при движении;
+- автосохранение в `localStorage`, с проверкой данных при загрузке.
+
+Погода берётся из бесплатного API Open-Meteo (ключ не нужен); без сети виджет показывает «Нет данных».
 
 ## В проекте намеренно нет
-- авторизации;
-- регистрации;
-- аккаунтов;
-- сервера;
-- базы данных;
-- P2P / multiplayer;
-- платёжной логики;
-- внешней SaaS-инфраструктуры.
-
-Это именно редактор виджетов.
+авторизации, аккаунтов, собственного сервера, базы данных, P2P / multiplayer, платёжной логики.
 
 ## Запуск
+Нужен Node.js 22+ (этого требует Capacitor 8).
 ```bash
 npm install
 npm test
@@ -34,22 +27,25 @@ npm run build
 npm run dev
 ```
 
+## Структура
+```
+src/model.ts        чистая модель: дерево областей, виджеты, проверка данных
+src/history.ts      undo/redo с объединением частых правок
+src/storage.ts      сохранение и безопасная загрузка
+src/hooks.ts        время и погода
+src/widgets.tsx     каталог и отображение виджетов
+src/components/     Canvas, Inspector, Catalog, Sheet
+tests/              unit-тесты (node --test)
+```
+
 ## Android
+Папка `android/` создаётся командой и в репозитории не хранится.
 ```bash
 npx cap add android
 npm run cap:sync
 npm run device:android
 ```
-
-Debug APK:
-```bash
-npm run android:debug
-```
-
-APK: `android/app/build/outputs/apk/debug/app-debug.apk`
+Debug APK: `npm run android:debug` → `android/app/build/outputs/apk/debug/app-debug.apk`
 
 ## GitHub Actions
-
-CI intentionally uses `npm install` without npm dependency caching. The project does not require a committed lock file, so GitHub Actions will not fail at `actions/setup-node` looking for `package-lock.json`.
-
-The workflow then runs tests, TypeScript checking, the web build and the Android debug APK build.
+Workflow `.github/workflows/android-debug.yml` ставит зависимости через `npm install` без кэша (lock-файл не обязателен), затем запускает тесты, проверку типов, web-сборку и собирает debug APK.

@@ -1,9 +1,9 @@
 import type { CapacitorConfig } from '@capacitor/cli'
+
 const config: CapacitorConfig = {
   appId: 'com.dragon.widgeteditor',
-  appName: 'Widget Editor',
+  appName: 'Widgetly',
   webDir: 'dist',
-  bundledWebRuntime: false,
   android: { backgroundColor: '#0b0b0c' }
 }
 export default config
