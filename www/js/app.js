@@ -19,9 +19,7 @@ function applyTheme() {
   const dark = th === 'dark' || (th === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
 }
-const themeMedia = matchMedia('(prefers-color-scheme: dark)');
-if (themeMedia.addEventListener) themeMedia.addEventListener('change', applyTheme);
-else if (themeMedia.addListener) themeMedia.addListener(applyTheme);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 
 let pt;
 function persist(now) {
