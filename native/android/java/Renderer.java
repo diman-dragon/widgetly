@@ -2,6 +2,9 @@ package __APP_ID__;
 
 import android.app.AlarmManager;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.os.BatteryManager;
 import android.graphics.*;
 import android.text.format.DateFormat;
 import org.json.JSONArray;
@@ -185,7 +188,7 @@ final class Renderer {
                 break;
             }
             case "weather": drawWeather(c, cv, p, cr, o, al, sc, net); break;
-            case "notif": drawNotif(c, cv, p, cr, o, al, sc, dens); break;
+            case "battery": drawFit(cv, batteryText(c), p, cr, al, sc); break;
             case "alarm": drawFit(cv, "⏰ " + alarmText(c), p, cr, al, sc); break;
             default: break;
         }
@@ -222,23 +225,16 @@ final class Renderer {
         stack(cv, p, textR, ls, al, sc);
     }
 
-    // ---------- notifications / alarm ----------
-    private static void drawNotif(Context c, Canvas cv, Paint p, RectF cr, JSONObject o, String al, float sc, float dens) throws Exception {
-        List<Ln> ls = new ArrayList<>();
-        if (!NotifListener.granted(c)) {
-            ls.add(new Ln("🔔 —", 1.2f));
-            ls.add(new Ln(WeatherService.ru() ? "Нет доступа" : "No access", 0.7f).a(0.6f));
-        } else {
-            JSONObject n = new JSONObject(Store.getString(c, "notif", "{}"));
-            ls.add(new Ln("🔔 " + n.optInt("n", 0), 1.3f));
-            JSONArray items = n.optJSONArray("items");
-            if (o.optBoolean("list", true) && items != null) {
-                int fit = Math.max(0, (int) (cr.height() / (20 * dens)) - 1);
-                int max = Math.min(Math.min(o.optInt("max", 3), fit), items.length());
-                for (int i = 0; i < max; i++) ls.add(new Ln(items.getString(i), 0.8f).a(0.75f));
-            }
-        }
-        stack(cv, p, cr, ls, al, sc);
+    // ---------- battery / alarm ----------
+    static String batteryText(Context c) {
+        try {
+            Intent i = c.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            if (i == null) return "🔋 —";
+            int l = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1), sc = i.getIntExtra(BatteryManager.EXTRA_SCALE, 100);
+            int st = i.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+            boolean ch = st == BatteryManager.BATTERY_STATUS_CHARGING || st == BatteryManager.BATTERY_STATUS_FULL;
+            return (ch ? "⚡ " : "🔋 ") + Math.round(l * 100f / sc) + "%";
+        } catch (Exception e) { return "🔋 —"; }
     }
 
     static String alarmText(Context c) {

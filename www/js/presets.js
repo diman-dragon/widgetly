@@ -8,8 +8,8 @@ export const FONTS = [
 ];
 export const CLOCK_FMT = ['HH:mm', 'H:mm', 'hh:mm', 'h:mm', 'h:mm a', 'hh:mm a'];
 export const DATE_FMT = ['EEEE, d MMMM', 'EEE, d MMM', 'EEEE d MMM', 'd MMMM', 'dd.MM.yyyy', 'EEEE', 'd MMM yyyy'];
-export const BLOCK_TYPES = ['clock', 'date', 'weather', 'notif', 'alarm'];
-export const TYPE_ICON = { clock: '🕒', date: '📅', weather: '⛅', notif: '🔔', alarm: '⏰' };
+export const BLOCK_TYPES = ['clock', 'date', 'weather', 'battery', 'alarm'];
+export const TYPE_ICON = { clock: '🕒', date: '📅', weather: '⛅', battery: '🔋', alarm: '⏰' };
 export const PRESET_LIST = [
   ['samsung', 'Samsung One UI'], ['apple', 'Apple'], ['htc', 'HTC Sense'], ['empty', '—'],
 ];
@@ -23,7 +23,7 @@ function optFor(type, s) {
     case 'clock': return { fmt: 'HH:mm', tz: '' };
     case 'date': return { fmt: 'EEEE, d MMMM', upper: false };
     case 'weather': return { city: s.city.name, lat: s.city.lat, lon: s.city.lon, service: s.service, units: s.units, icon: true, showCity: true, showCond: true, showHiLo: false };
-    case 'notif': return { list: true, max: 3 };
+    case 'battery': return {};
     default: return {};
   }
 }
@@ -37,7 +37,7 @@ export function newBlock(type, x, y, w, h, s, extra = {}) {
   };
 }
 
-export const DEFAULT_SIZE = { clock: [3, 1], date: [3, 1], weather: [2, 2], notif: [2, 1], alarm: [1, 1] };
+export const DEFAULT_SIZE = { clock: [3, 1], date: [3, 1], weather: [2, 2], battery: [2, 1], alarm: [1, 1] };
 
 function base(name, o) {
   return {
@@ -59,7 +59,7 @@ export function newDesign(preset, s) {
           B('date', 0, 2, 2, 1, { scale: 0.7, opt: { fmt: 'EEE, d MMM' } }),
           B('alarm', 2, 2, 1, 1, { scale: 0.7, align: 'right' }),
           B('weather', 3, 0, 2, 2, { align: 'center' }),
-          B('notif', 3, 2, 2, 1, { align: 'center', opt: { list: false } }),
+          B('battery', 3, 2, 2, 1, { align: 'center', opt: { list: false } }),
         ],
       });
     case 'apple': // синий градиент, погода крупно слева, дата и часы справа

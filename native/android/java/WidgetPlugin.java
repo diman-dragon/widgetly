@@ -127,20 +127,6 @@ public class WidgetPlugin extends Plugin {
     }
 
     @PluginMethod
-    public void notifAccess(PluginCall call) {
-        JSObject o = new JSObject();
-        o.put("granted", NotifListener.granted(ctx()));
-        call.resolve(o);
-    }
-
-    @PluginMethod
-    public void openNotifAccess(PluginCall call) {
-        Intent i = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        getContext().startActivity(i);
-        call.resolve();
-    }
-
-    @PluginMethod
     public void openUrl(PluginCall call) {
         try {
             Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(call.getString("url", ""))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

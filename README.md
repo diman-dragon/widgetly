@@ -13,7 +13,7 @@ Android-приложение (Capacitor) для создания и редакт
 | Рендер | `Renderer.java` | Рисует виджет в Bitmap по JSON-дизайну. **Тот же код** рисует превью в редакторе и сам виджет |
 | Обновления | `Updater.java`, `TickReceiver`, `SysReceiver` | Политика обновления частей (см. ниже) |
 | Погода | `WeatherService.java` | Open-Meteo (по умолчанию) и MET Norway — без регистрации и ключей |
-| Уведомления | `NotifListener.java` | Счётчик и заголовки активных уведомлений |
+| Батарея | `Renderer.batteryText()` | Заряд батареи без разрешений |
 
 Дизайн виджета — JSON: сетка `cols × rows` (по умолчанию 5×3), блоки `{type,x,y,w,h,font,color,scale,align,opt…}`,
 фон/градиент/скругление, разделители. Пресеты (Samsung One UI, Apple, HTC Sense) — в `www/js/presets.js`.

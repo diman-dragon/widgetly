@@ -28,8 +28,6 @@ export const native = {
   async getWidgets() { if (!P) return []; try { return JSON.parse((await P.getWidgets()).widgets); } catch { return []; } },
   async assignWidget(widgetId, designId) { if (P) await P.assignWidget({ widgetId, designId }); },
   async pinWidget(designId, size) { return P ? (await P.pinWidget({ designId, size })).supported : false; },
-  async notifAccess() { return P ? (await P.notifAccess()).granted : false; },
-  async openNotifAccess() { if (P) await P.openNotifAccess(); },
   async openUrl(url) { if (P) await P.openUrl({ url }); else window.open(url, '_blank'); },
   async info() { return P ? await P.getInfo() : { version: 'web', build: '0', appId: 'web' }; },
   async getLaunchDesign() { if (!P) return ''; try { return (await P.getLaunchDesign()).id; } catch { return ''; } },

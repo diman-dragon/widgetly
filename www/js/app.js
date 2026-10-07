@@ -231,7 +231,6 @@ function blockPanel(d) {
       + chk('o', 'icon', o.icon, t('showIcon')) + chk('o', 'showCity', o.showCity, t('showCity'))
       + chk('o', 'showCond', o.showCond, t('showCond')) + chk('o', 'showHiLo', o.showHiLo, t('showHiLo'));
   }
-  if (b.type === 'notif') h += chk('o', 'list', o.list, t('list')) + f(t('max'), num('o', 'max', o.max, 1, 5));
   h += `<h2 style="margin-top:14px">${t('blockBg')}</h2>${chk('k', 'bgOn', !!b.bg, t('blockBg'))}`;
   if (b.bg) h += f(t('color'), clr('k', 'bg', b.bg)) + f(t('blockBgA'), rng('k', 'bgA', b.bgA, 0, 100)) + f(t('radius'), rng('k', 'radius', b.radius, 0, 40));
   h += `<h2 style="margin-top:14px">${t('dividers')}</h2>${chk('k', 'divR', b.divR, t('divR'))}${chk('k', 'divB', b.divB, t('divB'))}`;
@@ -308,7 +307,7 @@ async function onAct(e) {
 
 // ---------- НАСТРОЙКИ (шестерёнка) ----------
 async function Settings() {
-  const s = S.settings, info = await native.info(), na = await native.notifAccess();
+  const s = S.settings, info = await native.info();
   app.innerHTML = `
   <header class="bar"><button class="icon" id="back" aria-label="${t('back')}">←</button><h1>${t('settings')}</h1></header>
   <main>
@@ -321,8 +320,6 @@ async function Settings() {
       ${f(t('interval'), sel('s', 'weatherHours', String(s.weatherHours), ['1', '3', '6', '12'].map((x) => [x, x])))}
       <p class="mu">${t('wNew')}</p>
     </div>
-    <h2>${t('notifAccess')}</h2>
-    <div class="panel"><div class="f"><span>${na ? t('granted') : t('notGranted')}</span><button class="sm" data-act="na">${t('open')}</button></div><p class="mu">${t('notifWhy')}</p></div>
     <h2>${t('updates')}</h2><div class="panel"><p class="mu" style="margin:0">${t('updatesText')}</p></div>
     <h2>${t('about')}</h2>
     <div class="panel">
@@ -342,8 +339,7 @@ async function Settings() {
   root.onclick = async (e) => {
     const bt = e.target.closest('[data-act]');
     if (!bt) return;
-    if (bt.dataset.act === 'na') native.openNotifAccess();
-    else if (bt.dataset.act === 'priv') native.openUrl(PRIVACY_URL);
+    if (bt.dataset.act === 'priv') native.openUrl(PRIVACY_URL);
     else if (bt.dataset.act === 'city') {
       const q = $('#cityq').value.trim();
       if (!q) return;
@@ -366,6 +362,7 @@ async function Settings() {
 (async function init() {
   const r = await native.loadAll();
   S.designs = r.designs;
+  S.designs.forEach((d) => d.blocks.forEach((b) => { if (b.type === 'notif') { b.type = 'battery'; b.opt = {}; } }));
   S.settings = { ...defaultSettings(), ...r.settings };
   applyTheme();
   if (!S.designs.length) { S.designs.push(newDesign('samsung', S.settings)); await persist(true); }

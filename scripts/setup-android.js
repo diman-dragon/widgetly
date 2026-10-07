@@ -30,6 +30,7 @@ function copyDir(from, to) {
   for (const f of fs.readdirSync(from, { withFileTypes: true })) {
     const a = path.join(from, f.name), b = path.join(to, f.name);
     if (f.isDirectory()) copyDir(a, b);
+    else if (/\.(png|webp|jpg|ttf|otf)$/i.test(f.name)) fs.copyFileSync(a, b);
     else fs.writeFileSync(b, tpl(fs.readFileSync(a, 'utf8')));
   }
 }

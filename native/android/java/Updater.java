@@ -160,8 +160,8 @@ final class Updater {
                 sig.append(wd == null ? "x" : wd.ts + ":" + Math.round(wd.temp)).append(';');
             } else if ("alarm".equals(type)) {
                 sig.append(Renderer.alarmText(c)).append(';');
-            } else if ("notif".equals(type)) {
-                sig.append(Store.getString(c, "notif", "")).append(NotifListener.granted(c)).append(';');
+            } else if ("battery".equals(type)) {
+                sig.append(Renderer.batteryText(c)).append(';');
             }
         }
         int[] wh = sizePx(c, m, id, d, dens);

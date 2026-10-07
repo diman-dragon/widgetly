@@ -42,3 +42,4 @@ export const LANG = lang === 0 ? 'ru' : 'en';
 export const t = (k) => (T[k] ? T[k][lang] : k);
 T.wNew = ['Применяется к новым блокам погоды. Существующие меняются в редакторе.', 'Applies to new weather blocks. Existing ones are edited in the editor.'];
 T.sizeQ = ['Размер виджета', 'Widget size'];
+T.battery = ['Батарея', 'Battery'];
