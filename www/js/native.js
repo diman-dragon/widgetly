@@ -10,8 +10,15 @@ const DPR = () => Math.min(window.devicePixelRatio || 2, 3);
 export const native = {
   isNative: !!P,
   async loadAll() {
-    if (P) { const r = await P.loadAll(); return { designs: JSON.parse(r.designs || '[]'), settings: JSON.parse(r.settings || '{}') }; }
-    return { designs: ls.get('designs', []), settings: ls.get('settings', {}) };
+    try {
+      if (P) {
+        const r = await P.loadAll();
+        return { designs: JSON.parse(r.designs || '[]'), settings: JSON.parse(r.settings || '{}') };
+      }
+      return { designs: ls.get('designs', []), settings: ls.get('settings', {}) };
+    } catch {
+      return { designs: [], settings: {} };
+    }
   },
   async saveDesigns(d) { if (P) await P.saveDesigns({ json: JSON.stringify(d) }); else ls.set('designs', d); },
   async saveSettings(s) { if (P) await P.saveSettings({ json: JSON.stringify(s) }); else ls.set('settings', s); },

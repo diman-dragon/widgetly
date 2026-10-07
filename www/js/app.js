@@ -360,14 +360,26 @@ async function Settings() {
 
 // ---------- старт ----------
 (async function init() {
-  const r = await native.loadAll();
-  S.designs = r.designs;
-  S.designs.forEach((d) => d.blocks.forEach((b) => { if (b.type === 'notif') { b.type = 'battery'; b.opt = {}; } }));
-  S.settings = { ...defaultSettings(), ...r.settings };
-  applyTheme();
-  if (!S.designs.length) { S.designs.push(newDesign('samsung', S.settings)); await persist(true); }
-  history.replaceState({ s: 'home' }, '');
-  native.onOpenDesign((id) => find(id) && openEditor(id));
-  const id = await native.getLaunchDesign();
-  if (id && find(id)) openEditor(id); else Home();
+  try {
+    const r = await native.loadAll();
+    S.designs = Array.isArray(r.designs) ? r.designs : [];
+    S.designs = S.designs.filter((d) => d && Array.isArray(d.blocks)).map((d) => ({
+      ...d,
+      blocks: d.blocks.filter(Boolean),
+    }));
+    S.designs.forEach((d) => d.blocks.forEach((b) => { if (b.type === 'notif') { b.type = 'battery'; b.opt = {}; } }));
+    S.settings = { ...defaultSettings(), ...(r.settings && typeof r.settings === 'object' ? r.settings : {}) };
+    applyTheme();
+    if (!S.designs.length) { S.designs.push(newDesign('samsung', S.settings)); await persist(true); }
+    history.replaceState({ s: 'home' }, '');
+    native.onOpenDesign((id) => find(id) && openEditor(id));
+    const id = await native.getLaunchDesign();
+    if (id && find(id)) openEditor(id); else Home();
+  } catch (e) {
+    console.error('Widget Studio init failed', e);
+    S.designs = [newDesign('samsung', defaultSettings())];
+    S.settings = defaultSettings();
+    history.replaceState({ s: 'home' }, '');
+    Home();
+  }
 })();
