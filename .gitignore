@@ -1,10 +1,6 @@
 node_modules/
+android/
 dist/
-.vite/
-android/.gradle/
-android/build/
-android/app/build/
-android/local.properties
+*.jks
+*.keystore
 .DS_Store
-*.log
-*.local

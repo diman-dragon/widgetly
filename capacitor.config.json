@@ -1,0 +1,6 @@
+{
+  "appId": "com.widgetstudio.app",
+  "appName": "Widget Studio",
+  "webDir": "www",
+  "android": { "allowMixedContent": false }
+}
