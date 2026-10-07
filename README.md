@@ -47,3 +47,9 @@ npm run android:debug
 ```
 
 APK: `android/app/build/outputs/apk/debug/app-debug.apk`
+
+## GitHub Actions
+
+CI intentionally uses `npm install` without npm dependency caching. The project does not require a committed lock file, so GitHub Actions will not fail at `actions/setup-node` looking for `package-lock.json`.
+
+The workflow then runs tests, TypeScript checking, the web build and the Android debug APK build.

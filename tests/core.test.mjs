@@ -10,3 +10,16 @@ test('visual editor files exist',()=>{for(const f of ['src/App.tsx','src/model.t
 test('no auth words in source filenames',()=>{const files=walk(join(root,'src'));assert.equal(files.some(f=>/auth|server|p2p|multiplayer/i.test(f)),false)})
 function statSafe(p){try{statSync(p);return true}catch{return false}}
 function walk(dir){let out=[];for(const e of readdirSync(dir,{withFileTypes:true})){const p=join(dir,e.name);if(e.isDirectory())out.push(...walk(p));else out.push(p)}return out}
+
+
+test('github workflow does not require a lock-file cache',()=>{
+ const workflow=readFileSync(join(root,'.github/workflows/android-debug.yml'),'utf8')
+ assert.doesNotMatch(workflow,/cache:\s*npm/)
+ assert.match(workflow,/npm install --no-audit --no-fund/)
+})
+test('split actions pass the selected leaf id and direction',()=>{
+ const app=readFileSync(join(root,'src/App.tsx'),'utf8')
+ assert.match(app,/p\.split\(n\.id,'horizontal'\)/)
+ assert.match(app,/p\.split\(n\.id,'vertical'\)/)
+ assert.match(app,/split\(snapshot\.root,leafId,direction\)/)
+})
