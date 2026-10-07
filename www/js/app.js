@@ -377,9 +377,10 @@ async function Settings() {
     if (id && find(id)) openEditor(id); else Home();
   } catch (e) {
     console.error('Widget Studio init failed', e);
+    app.innerHTML = `<div style="padding:24px;color:var(--danger,#d93b3b);background:var(--card,#1a1b20);border-radius:12px;margin:16px;"><h3>Startup Error</h3><pre style="white-space:pre-wrap;word-break:break-all;">${esc(e.stack || e.message || e)}</pre></div>`;
     S.designs = [newDesign('samsung', defaultSettings())];
     S.settings = defaultSettings();
     history.replaceState({ s: 'home' }, '');
-    Home();
+    setTimeout(Home, 2000);
   }
 })();
