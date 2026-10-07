@@ -27,8 +27,12 @@
     "@capacitor/cli": "^8.5.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^6.0.0",
+    "@vitejs/plugin-react": "^5.0.4",
     "typescript": "^5.7.2",
     "vite": "^7.1.10"
+  },
+  "engines": {
+    "node": ">=20.19.0",
+    "npm": ">=10.0.0"
   }
 }
