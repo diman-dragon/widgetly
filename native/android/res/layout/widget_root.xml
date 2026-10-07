@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/bg_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY" />
+
+    <!-- Часы: системный TextClock, сам обновляется каждую минуту без участия приложения.
+         Шрифт задаётся в XML, поэтому на каждое семейство своя копия; нужная включается из кода. -->
+    <FrameLayout
+        android:id="@+id/clock_host"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+        <TextClock
+            android:id="@+id/clock_f0"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fontFamily="sans-serif"
+            android:includeFontPadding="false"
+            android:gravity="start|center_vertical"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textSize="40sp"
+            android:format12Hour="h:mm"
+            android:format24Hour="HH:mm"
+            android:visibility="gone" />
+        <TextClock
+            android:id="@+id/clock_f1"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fontFamily="sans-serif-light"
+            android:includeFontPadding="false"
+            android:gravity="start|center_vertical"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textSize="40sp"
+            android:format12Hour="h:mm"
+            android:format24Hour="HH:mm"
+            android:visibility="gone" />
+        <TextClock
+            android:id="@+id/clock_f2"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fontFamily="sans-serif-thin"
+            android:includeFontPadding="false"
+            android:gravity="start|center_vertical"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textSize="40sp"
+            android:format12Hour="h:mm"
+            android:format24Hour="HH:mm"
+            android:visibility="gone" />
+        <TextClock
+            android:id="@+id/clock_f3"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fontFamily="sans-serif-medium"
+            android:includeFontPadding="false"
+            android:gravity="start|center_vertical"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textSize="40sp"
+            android:format12Hour="h:mm"
+            android:format24Hour="HH:mm"
+            android:visibility="gone" />
+        <TextClock
+            android:id="@+id/clock_f4"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fontFamily="sans-serif-black"
+            android:includeFontPadding="false"
+            android:gravity="start|center_vertical"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textSize="40sp"
+            android:format12Hour="h:mm"
+            android:format24Hour="HH:mm"
+            android:visibility="gone" />
+        <TextClock
+            android:id="@+id/clock_f5"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fontFamily="sans-serif-condensed"
+            android:includeFontPadding="false"
+            android:gravity="start|center_vertical"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textSize="40sp"
+            android:format12Hour="h:mm"
+            android:format24Hour="HH:mm"
+            android:visibility="gone" />
+        <TextClock
+            android:id="@+id/clock_f6"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fontFamily="serif"
+            android:includeFontPadding="false"
+            android:gravity="start|center_vertical"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textSize="40sp"
+            android:format12Hour="h:mm"
+            android:format24Hour="HH:mm"
+            android:visibility="gone" />
+        <TextClock
+            android:id="@+id/clock_f7"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fontFamily="monospace"
+            android:includeFontPadding="false"
+            android:gravity="start|center_vertical"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textSize="40sp"
+            android:format12Hour="h:mm"
+            android:format24Hour="HH:mm"
+            android:visibility="gone" />
+        <TextClock
+            android:id="@+id/clock_f8"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fontFamily="casual"
+            android:includeFontPadding="false"
+            android:gravity="start|center_vertical"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textSize="40sp"
+            android:format12Hour="h:mm"
+            android:format24Hour="HH:mm"
+            android:visibility="gone" />
+        <TextClock
+            android:id="@+id/clock_f9"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fontFamily="cursive"
+            android:includeFontPadding="false"
+            android:gravity="start|center_vertical"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textSize="40sp"
+            android:format12Hour="h:mm"
+            android:format24Hour="HH:mm"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <ImageView
+        android:id="@+id/btn_tl"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:layout_gravity="top|start"
+        android:layout_margin="2dp"
+        android:padding="8dp"
+        android:src="@drawable/ic_refresh"
+        android:contentDescription="@string/ws_refresh"
+        android:visibility="gone" />
+    <ImageView
+        android:id="@+id/btn_tr"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="2dp"
+        android:padding="8dp"
+        android:src="@drawable/ic_refresh"
+        android:contentDescription="@string/ws_refresh"
+        android:visibility="gone" />
+    <ImageView
+        android:id="@+id/btn_bl"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:layout_gravity="bottom|start"
+        android:layout_margin="2dp"
+        android:padding="8dp"
+        android:src="@drawable/ic_refresh"
+        android:contentDescription="@string/ws_refresh"
+        android:visibility="gone" />
+    <ImageView
+        android:id="@+id/btn_br"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="2dp"
+        android:padding="8dp"
+        android:src="@drawable/ic_refresh"
+        android:contentDescription="@string/ws_refresh"
+        android:visibility="gone" />
+</FrameLayout>

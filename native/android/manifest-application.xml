@@ -1,0 +1,25 @@
+        <receiver android:name=".Widget5x3" android:exported="true" android:label="Widget Studio 5×3">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/ws_info_5x3" />
+        </receiver>
+        <receiver android:name=".Widget4x2" android:exported="true" android:label="Widget Studio 4×2">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/ws_info_4x2" />
+        </receiver>
+        <receiver android:name=".Widget2x2" android:exported="true" android:label="Widget Studio 2×2">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/ws_info_2x2" />
+        </receiver>
+        <receiver android:name=".TickReceiver" android:exported="false" />
+        <receiver android:name=".SysReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+        <service android:name=".NotifListener" android:exported="true" android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter><action android:name="android.service.notification.NotificationListenerService" /></intent-filter>
+        </service>

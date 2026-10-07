@@ -13,6 +13,12 @@ const cfg = JSON.parse(fs.readFileSync(path.join(root, 'capacitor.config.json'),
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const appId = cfg.appId;
 
+if (!fs.existsSync(path.join(src0(), 'java'))) {
+  console.error('Не найдена папка native/android/java. Проверьте, что она закоммичена в git (git add -f native).');
+  process.exit(1);
+}
+function src0() { return path.join(root, 'native/android'); }
+
 if (!fs.existsSync(path.join(root, 'android'))) run('npx cap add android');
 
 const main = path.join(root, 'android/app/src/main');
