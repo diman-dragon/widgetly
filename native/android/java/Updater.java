@@ -135,6 +135,7 @@ final class Updater {
         }
         sig.append('|').append(cfg.toString().hashCode()).append('|').append(dts / 86400000L).append('|').append(wh[0]).append('x').append(wh[1]);
         sig.append('|').append(Store.getLong(c, "bgRev", 0));
+        sig.append('|').append(java.util.TimeZone.getDefault().getID()); // смена пояса → перерисовка
         String sg = sig.toString();
         if (mode != FORCE && sg.equals(Store.getString(c, "sig_" + id, ""))) return;
 
@@ -167,12 +168,14 @@ final class Updater {
             String cs = ck.optString("color", "");
             int color = cs.isEmpty() ? fg : Renderer.col(cs, -1, fg);
             rv.setViewVisibility(R.id.clock_host, View.VISIBLE);
-            rv.setViewPadding(R.id.clock_host, Math.round(r.left), Math.round(r.top), Math.round(w - r.right), Math.round(h - r.bottom));
+            // справа отступ 0: текст прижат влево и сам укладывается в блок, лишней ширины хватает, чтобы ничего не обрезалось
+            rv.setViewPadding(R.id.clock_host, Math.round(r.left), Math.round(r.top), 0, Math.round(h - r.bottom));
             for (int i = 0; i < CLK.length; i++) rv.setViewVisibility(CLK[i], i == fam ? View.VISIBLE : View.GONE);
             int cid = CLK[fam];
             rv.setCharSequence(cid, "setFormat12Hour", fmt);
             rv.setCharSequence(cid, "setFormat24Hour", fmt);
-            if (!tz.isEmpty()) rv.setString(cid, "setTimeZone", tz);
+            // часовой пояс задаём всегда: свой или текущий пояс устройства
+            rv.setString(cid, "setTimeZone", tz.isEmpty() ? java.util.TimeZone.getDefault().getID() : tz);
             rv.setTextColor(cid, color);
             rv.setTextViewTextSize(cid, TypedValue.COMPLEX_UNIT_PX, Renderer.clockSize(cfg, w, h));
         }

@@ -87,7 +87,8 @@ final class Renderer {
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         p.setTypeface(tf(ck.optString("font", "sans-serif-light")));
         RectF r = clockRect(cfg, w, h);
-        return fitSize(p, clockSample(ck.optString("fmt", "HH:mm")), r.width(), r.height(), (float) ck.optDouble("scale", 1));
+        // 0.9 — запас: реальный TextClock и растяжка картинки дают отличие в ширине, без запаса обрезается последняя цифра
+        return 0.9f * fitSize(p, clockSample(ck.optString("fmt", "HH:mm")), r.width(), r.height(), (float) ck.optDouble("scale", 1));
     }
 
     // ---------- main ----------
@@ -247,7 +248,7 @@ final class Renderer {
             Paint p = paint(cs.isEmpty() ? fg : col(cs, -1, fg), 1f, ck.optString("font", "sans-serif-light"));
             p.setShadowLayer(4 * dens, 0, 2 * dens, 0x66000000);
             String tz = ck.optString("tz", "");
-            String s = fmt(ck.optString("fmt", "HH:mm"), "HH:mm", new Date(), tz.isEmpty() ? null : TimeZone.getTimeZone(tz));
+            String s = fmt(ck.optString("fmt", "HH:mm"), "HH:mm", new Date(), TimeZone.getTimeZone(tz.isEmpty() ? TimeZone.getDefault().getID() : tz));
             p.setTextSize(clockSize(cfg, w, h));
             RectF r = clockRect(cfg, w, h);
             Paint.FontMetrics fm = p.getFontMetrics();
