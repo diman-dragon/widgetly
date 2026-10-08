@@ -221,7 +221,9 @@ final class WeatherService {
     private static String symbolOf(JSONObject data) {
         for (String k : new String[]{"next_6_hours", "next_1_hours", "next_12_hours"}) {
             JSONObject n = data.optJSONObject(k);
-            if (n != null && n.optJSONObject("summary") != null) return n.getJSONObject("summary").optString("symbol_code", null);
+            if (n == null) continue;
+            JSONObject sm = n.optJSONObject("summary");
+            if (sm != null) return sm.optString("symbol_code", null);
         }
         return null;
     }

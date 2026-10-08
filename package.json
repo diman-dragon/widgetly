@@ -1,6 +1,6 @@
 {
   "name": "widget-studio",
-  "version": "1.0.0",
+  "version": "3.0.2",
   "private": true,
   "description": "Android home-screen widget builder (Capacitor)",
   "scripts": {
