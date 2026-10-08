@@ -19,7 +19,7 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme
 let pt;
 function persist() {
   clearTimeout(pt);
-  pt = setTimeout(async () => { await native.saveCfg(S.cfg); await native.refresh(); }, 500);
+  pt = setTimeout(async () => { try { await native.saveCfg(S.cfg); await native.refresh(); } catch (e) { window.showErr && showErr('Сохранение: ' + (e.message || e)); } }, 500);
 }
 let rt, rn = 0;
 function touch() {
@@ -194,13 +194,21 @@ async function Settings() {
 }
 
 // ---------- старт ----------
+// Интерфейс показываем сразу (с настройками по умолчанию), сохранённые данные подгружаем следом.
 (async function init() {
-  const r = await native.loadAll();
-  S.cfg = merge(defaultCfg(), r.cfg);
-  S.settings = { ...defaultSettings(), ...r.settings };
-  S.hasPhoto = S.cfg.bgMode === 'photo';
   applyTheme();
   history.replaceState({ s: 'home' }, '');
   Home();
-  persist();
+  window.__wsReady = true;
+  try {
+    const r = await native.loadAll();
+    S.cfg = merge(defaultCfg(), r.cfg);
+    S.settings = { ...defaultSettings(), ...r.settings };
+    S.hasPhoto = S.cfg.bgMode === 'photo';
+    applyTheme();
+    if (S.screen === 'home') Home();
+    persist();
+  } catch (e) {
+    window.showErr && showErr('Загрузка настроек: ' + (e.message || e));
+  }
 })();

@@ -8,7 +8,18 @@
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-  <div id="app"></div>
-  <script type="module" src="js/app.js"></script>
+  <pre id="err" hidden style="white-space:pre-wrap;margin:0;padding:10px 14px;background:#7a1f1f;color:#fff;font:12px/1.4 monospace"></pre>
+  <div id="app"><p style="padding:24px;font:16px system-ui">Widget Studio…</p></div>
+  <script>
+    // Диагностика: любая ошибка JS показывается на экране, а не остаётся белым экраном.
+    window.showErr = function (m) {
+      var e = document.getElementById('err');
+      e.hidden = false; e.textContent += m + '\n';
+    };
+    window.addEventListener('error', function (e) { showErr('JS: ' + e.message + ' (' + (e.filename || '').split('/').pop() + ':' + e.lineno + ')'); });
+    window.addEventListener('unhandledrejection', function (e) { showErr('Promise: ' + (e.reason && (e.reason.message || e.reason))); });
+    setTimeout(function () { if (!window.__wsReady) showErr('Интерфейс не запустился за 5 с — проверьте ошибки выше.'); }, 5000);
+  </script>
+  <script type="module" src="js/app.js" onerror="showErr('Не удалось загрузить js/app.js')"></script>
 </body>
 </html>

@@ -5,12 +5,13 @@ const ls = {
   get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
   set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
 };
+const timeout = (p, ms, name) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('Нативный вызов ' + name + ' не ответил за ' + ms / 1000 + ' с')), ms))]);
 const DPR = () => Math.min(window.devicePixelRatio || 2, 3);
 
 export const native = {
   isNative: !!P,
   async loadAll() {
-    if (P) { const r = await P.loadAll(); return { cfg: JSON.parse(r.cfg || '{}'), settings: JSON.parse(r.settings || '{}') }; }
+    if (P) { const r = await timeout(P.loadAll(), 4000, 'loadAll'); return { cfg: JSON.parse(r.cfg || '{}'), settings: JSON.parse(r.settings || '{}') }; }
     return { cfg: ls.get('cfg', {}), settings: ls.get('settings', {}) };
   },
   async saveCfg(c) { if (P) await P.saveCfg({ json: JSON.stringify(c) }); else ls.set('cfg', c); },
