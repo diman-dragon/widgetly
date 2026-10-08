@@ -1,6 +1,16 @@
 // Мост к нативной части. В обычном браузере (npm run web) работает заглушка на localStorage.
 const cap = window.Capacitor;
-const P = cap && cap.isNativePlatform && cap.isNativePlatform() ? cap.registerPlugin('WidgetBridge') : null;
+const isNative = !!(cap && cap.isNativePlatform && cap.isNativePlatform());
+// В Capacitor 7/8 нативный мост не содержит registerPlugin (он есть только в бандле @capacitor/core,
+// а сборщика у нас нет), поэтому вызываем плагин напрямую через мост: nativePromise(плагин, метод, параметры).
+function makePlugin(name) {
+  if (typeof cap.registerPlugin === 'function') return cap.registerPlugin(name);
+  if (typeof cap.nativePromise !== 'function') throw new Error('Capacitor bridge: нет nativePromise');
+  return new Proxy({}, {
+    get: (_, method) => (method === 'then' ? undefined : (opts) => cap.nativePromise(name, String(method), opts || {})),
+  });
+}
+const P = isNative ? makePlugin('WidgetBridge') : null;
 const ls = {
   get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
   set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
