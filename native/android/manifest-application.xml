@@ -1,14 +1,6 @@
-        <receiver android:name=".Widget5x3" android:exported="true" android:label="Widget Studio 5×3">
+        <receiver android:name=".WidgetProvider" android:exported="true" android:label="Widget Studio">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/ws_info_5x3" />
-        </receiver>
-        <receiver android:name=".Widget4x2" android:exported="true" android:label="Widget Studio 4×2">
-            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/ws_info_4x2" />
-        </receiver>
-        <receiver android:name=".Widget2x2" android:exported="true" android:label="Widget Studio 2×2">
-            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/ws_info_2x2" />
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/ws_info" />
         </receiver>
         <receiver android:name=".TickReceiver" android:exported="false" />
         <receiver android:name=".SysReceiver" android:exported="true">

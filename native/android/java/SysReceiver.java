@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 
-/** Системные события: загрузка, обновление приложения, смена времени/пояса. */
+/** Загрузка устройства, обновление приложения, смена времени/пояса. */
 public class SysReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context c, Intent i) {

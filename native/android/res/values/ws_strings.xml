@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ws_refresh">Refresh</string>
-    <string name="ws_desc">Customizable clock, date, weather, alarm and battery</string>
+    <string name="ws_desc">Clock, date and 3-day weather forecast</string>
 </resources>

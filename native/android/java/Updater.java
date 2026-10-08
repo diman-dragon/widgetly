@@ -13,18 +13,17 @@ import android.graphics.RectF;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.util.TypedValue;
+import android.view.View;
 import android.widget.RemoteViews;
-import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.Calendar;
 
 /**
  * Политика обновления:
  *  - часы:   системный TextClock, сам каждую минуту (секунд нет);
- *  - дата:   один раз в сутки — при первом "тике" с включённым экраном после смены дня;
- *  - погода: раз в N часов (по умолчанию 6) — только при включённом экране;
- *  - уведомления/будильник: по событию / на тике, только при включённом экране;
- *  - при выключенном экране ничего не делаем и не будим устройство (будильник не-wakeup).
+ *  - дата/день недели: раз в сутки — на первом «тике» с включённым экраном после смены дня;
+ *  - погода: не чаще раза в 6/12/24 часа (по настройке), только при включённом экране; прогноз приходит тем же запросом;
+ *  - при выключенном экране ничего не рисуется и устройство не будится (не-wakeup будильник).
  */
 final class Updater {
     private Updater() {}
@@ -39,22 +38,9 @@ final class Updater {
             "sans-serif-black", "sans-serif-condensed", "serif", "monospace", "casual", "cursive"};
     private static final int[] CLK = {R.id.clock_f0, R.id.clock_f1, R.id.clock_f2, R.id.clock_f3, R.id.clock_f4,
             R.id.clock_f5, R.id.clock_f6, R.id.clock_f7, R.id.clock_f8, R.id.clock_f9};
-    private static final int[] BTN = {R.id.btn_tl, R.id.btn_tr, R.id.btn_bl, R.id.btn_br};
-    private static final String[] BTN_KEY = {"tl", "tr", "bl", "br"};
-
-    static final Class<?>[] PROVIDERS = {Widget5x3.class, Widget4x2.class, Widget2x2.class};
 
     static int[] allIds(Context c, AppWidgetManager m) {
-        int n = 0;
-        int[][] parts = new int[PROVIDERS.length][];
-        for (int i = 0; i < PROVIDERS.length; i++) {
-            parts[i] = m.getAppWidgetIds(new ComponentName(c, PROVIDERS[i]));
-            n += parts[i].length;
-        }
-        int[] out = new int[n];
-        int k = 0;
-        for (int[] a : parts) for (int v : a) out[k++] = v;
-        return out;
+        return m.getAppWidgetIds(new ComponentName(c, WidgetProvider.class));
     }
 
     static boolean screenOn(Context c) {
@@ -62,7 +48,7 @@ final class Updater {
         return pm == null || pm.isInteractive();
     }
 
-    // ---------- scheduling: не-wakeup, неточный, раз в 5 минут ----------
+    // ---------- расписание: не-wakeup, неточный, раз в 5 минут ----------
     private static PendingIntent tickPi(Context c) {
         Intent i = new Intent(c, TickReceiver.class).setAction(ACT_TICK);
         return PendingIntent.getBroadcast(c, 0, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
@@ -81,7 +67,7 @@ final class Updater {
         if (allIds(c, AppWidgetManager.getInstance(c)).length == 0) cancel(c); else schedule(c);
     }
 
-    // ---------- run ----------
+    // ---------- запуск ----------
     static void async(final Context c, final int mode, final BroadcastReceiver.PendingResult pr) {
         final Context app = c.getApplicationContext();
         new Thread(() -> {
@@ -111,7 +97,7 @@ final class Updater {
         return x.get(Calendar.YEAR) == y.get(Calendar.YEAR) && x.get(Calendar.DAY_OF_YEAR) == y.get(Calendar.DAY_OF_YEAR);
     }
 
-    static int[] sizePx(Context c, AppWidgetManager m, int id, JSONObject d, float[] densOut) {
+    static int[] sizePx(Context c, AppWidgetManager m, int id, float[] densOut) {
         Bundle o = m.getAppWidgetOptions(id);
         float dens = c.getResources().getDisplayMetrics().density;
         boolean land = c.getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
@@ -121,7 +107,7 @@ final class Updater {
             wdp = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 0);
             hdp = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0);
         }
-        if (wdp <= 0 || hdp <= 0) { wdp = d.optInt("cols", 5) * 72; hdp = d.optInt("rows", 3) * 84; }
+        if (wdp <= 0 || hdp <= 0) { wdp = 320; hdp = 180; }
         float w = wdp * dens, h = hdp * dens;
         float limit = 1_400_000f; // лимит памяти RemoteViews
         if (w * h > limit) { float k = (float) Math.sqrt(limit / (w * h)); w *= k; h *= k; dens *= k; }
@@ -131,106 +117,74 @@ final class Updater {
 
     private static void updateOne(Context c, AppWidgetManager m, int id, int mode) throws Exception {
         long now = System.currentTimeMillis();
-        JSONObject d = Store.designFor(c, id);
+        JSONObject cfg = Store.cfg(c);
         float[] dens = new float[1];
-        if (d == null) {
-            int[] wh = sizePx(c, m, id, new JSONObject(), dens);
-            Bitmap bmp = Renderer.message(WeatherService.ru() ? "Откройте Widget Studio" : "Open Widget Studio", wh[0], wh[1], dens[0]);
-            RemoteViews rv = new RemoteViews(c.getPackageName(), R.layout.widget_root);
-            rv.setImageViewBitmap(R.id.bg_image, bmp);
-            m.updateAppWidget(id, rv);
-            return;
-        }
+        int[] wh = sizePx(c, m, id, dens);
+
         // дата — раз в сутки
         long dts = Store.getLong(c, "dateTs_" + id, 0);
         if (mode == FORCE || !sameDay(dts, now)) { dts = now; Store.putLong(c, "dateTs_" + id, dts); }
 
-        // погода — по интервалу
-        long interval = Store.settings(c).optInt("weatherHours", 6) * 3600_000L;
+        // погода — по интервалу (не меньше 6 ч), только при включённом экране (тик/система/кнопка — всегда с экрана)
+        JSONObject wc = Renderer.sub(cfg, "weather");
         StringBuilder sig = new StringBuilder();
-        JSONArray bl = d.optJSONArray("blocks");
-        if (bl == null) bl = new JSONArray();
-        for (int i = 0; i < bl.length(); i++) {
-            JSONObject b = bl.optJSONObject(i);
-            if (b == null) continue;
-            String type = b.optString("type");
-            JSONObject o = b.optJSONObject("opt");
-            if ("weather".equals(type) && o != null) {
-                WeatherService.Data wd = WeatherService.ensure(c, o, mode == FORCE, interval);
-                sig.append(wd == null ? "x" : wd.ts + ":" + Math.round(wd.temp)).append(';');
-            } else if ("alarm".equals(type)) {
-                sig.append(Renderer.alarmText(c)).append(';');
-            } else if ("battery".equals(type)) {
-                sig.append(Renderer.batteryText(c)).append(';');
-            }
+        if (wc.optBoolean("show", true) && wc.has("lat")) {
+            long interval = Math.max(6, wc.optInt("hours", 6)) * 3600_000L;
+            WeatherService.Data wd = WeatherService.ensure(c, wc, false, interval);
+            sig.append(wd == null ? "x" : wd.ts + ":" + Math.round(wd.temp));
         }
-        int[] wh = sizePx(c, m, id, d, dens);
-        sig.append(d.toString().hashCode()).append('|').append(Long.toString(dts / 86400000L)).append('|').append(wh[0]).append('x').append(wh[1]);
+        sig.append('|').append(cfg.toString().hashCode()).append('|').append(dts / 86400000L).append('|').append(wh[0]).append('x').append(wh[1]);
+        sig.append('|').append(Store.getLong(c, "bgRev", 0));
         String sg = sig.toString();
         if (mode != FORCE && sg.equals(Store.getString(c, "sig_" + id, ""))) return;
 
-        Bitmap bmp = Renderer.render(c, d, wh[0], wh[1], dens[0], dts, false, false);
-        m.updateAppWidget(id, build(c, id, d, bmp, wh[0], wh[1], dens[0]));
+        Bitmap bmp = Renderer.render(c, cfg, wh[0], wh[1], dens[0], dts, false, false);
+        m.updateAppWidget(id, build(c, id, cfg, bmp, wh[0], wh[1]));
         Store.putString(c, "sig_" + id, sg);
     }
 
-    private static RemoteViews build(Context c, int id, JSONObject d, Bitmap bmp, int w, int h, float dens) {
+    private static RemoteViews build(Context c, int id, JSONObject cfg, Bitmap bmp, int w, int h) {
         RemoteViews rv = new RemoteViews(c.getPackageName(), R.layout.widget_root);
         rv.setImageViewBitmap(R.id.bg_image, bmp);
 
-        // клик по виджету — открыть редактор этого дизайна
+        // тап по виджету — открыть приложение
         Intent launch = c.getPackageManager().getLaunchIntentForPackage(c.getPackageName());
         if (launch != null) {
-            launch.putExtra("edit", d.optString("id"));
             rv.setOnClickPendingIntent(R.id.widget_root, PendingIntent.getActivity(c, id, launch,
                     PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));
         }
 
         // часы (TextClock)
-        JSONObject clock = null;
-        JSONArray bl = d.optJSONArray("blocks");
-        for (int i = 0; bl != null && i < bl.length(); i++) {
-            JSONObject b = bl.optJSONObject(i);
-            if (b != null && "clock".equals(b.optString("type"))) { clock = b; break; }
-        }
-        if (clock == null) {
-            rv.setViewVisibility(R.id.clock_host, android.view.View.GONE);
+        JSONObject ck = Renderer.sub(cfg, "clock");
+        if (!ck.optBoolean("show", true)) {
+            rv.setViewVisibility(R.id.clock_host, View.GONE);
         } else {
-            RectF cr = Renderer.contentRect(Renderer.blockRect(d, clock, w, h, dens), dens);
-            float[] g = Renderer.clockGeom(clock, cr);
-            JSONObject o = clock.optJSONObject("opt");
-            String fmt = o == null ? "HH:mm" : o.optString("fmt", "HH:mm");
-            String tz = o == null ? "" : o.optString("tz", "");
-            int fam = 0;
-            for (int i = 0; i < FAMILIES.length; i++) if (FAMILIES[i].equals(clock.optString("font", "sans-serif"))) fam = i;
-            int fg = Renderer.col(d.optString("fg", "#FFFFFF"), -1, 0xFFFFFFFF);
-            String cs = clock.optString("color", "");
+            RectF r = Renderer.clockRect(cfg, w, h);
+            String fmt = ck.optString("fmt", "HH:mm"), tz = ck.optString("tz", "");
+            int fam = 1;
+            for (int i = 0; i < FAMILIES.length; i++) if (FAMILIES[i].equals(ck.optString("font", "sans-serif-light"))) fam = i;
+            int fg = Renderer.col(cfg.optString("fg", "#FFFFFF"), -1, 0xFFFFFFFF);
+            String cs = ck.optString("color", "");
             int color = cs.isEmpty() ? fg : Renderer.col(cs, -1, fg);
-            rv.setViewVisibility(R.id.clock_host, android.view.View.VISIBLE);
-            rv.setViewPadding(R.id.clock_host, Math.round(cr.left), Math.round(cr.top), Math.round(w - cr.right), Math.round(h - cr.bottom));
-            for (int i = 0; i < CLK.length; i++) rv.setViewVisibility(CLK[i], i == fam ? android.view.View.VISIBLE : android.view.View.GONE);
+            rv.setViewVisibility(R.id.clock_host, View.VISIBLE);
+            rv.setViewPadding(R.id.clock_host, Math.round(r.left), Math.round(r.top), Math.round(w - r.right), Math.round(h - r.bottom));
+            for (int i = 0; i < CLK.length; i++) rv.setViewVisibility(CLK[i], i == fam ? View.VISIBLE : View.GONE);
             int cid = CLK[fam];
             rv.setCharSequence(cid, "setFormat12Hour", fmt);
             rv.setCharSequence(cid, "setFormat24Hour", fmt);
             if (!tz.isEmpty()) rv.setString(cid, "setTimeZone", tz);
             rv.setTextColor(cid, color);
-            rv.setTextViewTextSize(cid, TypedValue.COMPLEX_UNIT_PX, g[0]);
-            rv.setViewPadding(cid, Math.round(g[1]), 0, 0, 0);
+            rv.setTextViewTextSize(cid, TypedValue.COMPLEX_UNIT_PX, Renderer.clockSize(cfg, w, h));
         }
 
-        // кнопка обновления
-        boolean show = d.optBoolean("refresh", true);
-        String corner = d.optString("rc", "tr");
-        Intent ri = new Intent(c, TickReceiver.class).setAction(ACT_REFRESH);
-        PendingIntent rpi = PendingIntent.getBroadcast(c, 1, ri, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-        int fg2 = Renderer.col(d.optString("fg", "#FFFFFF"), 80, 0xCCFFFFFF);
-        for (int i = 0; i < BTN.length; i++) {
-            boolean on = show && BTN_KEY[i].equals(corner);
-            rv.setViewVisibility(BTN[i], on ? android.view.View.VISIBLE : android.view.View.GONE);
-            if (on) {
-                rv.setOnClickPendingIntent(BTN[i], rpi);
-                rv.setInt(BTN[i], "setColorFilter", fg2);
-            }
+        // кнопка обновления (круглая, в правом верхнем углу)
+        boolean show = cfg.optBoolean("refresh", true);
+        rv.setViewVisibility(R.id.btn_refresh, show ? View.VISIBLE : View.GONE);
+        if (show) {
+            rv.setViewPadding(R.id.btn_host, 0, Math.round(0.06f * h), Math.round(0.04f * w), 0);
+            Intent ri = new Intent(c, TickReceiver.class).setAction(ACT_REFRESH);
+            rv.setOnClickPendingIntent(R.id.btn_refresh, PendingIntent.getBroadcast(c, 1, ri,
+                    PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));
         }
         return rv;
     }

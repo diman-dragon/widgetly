@@ -10,35 +10,27 @@ const DPR = () => Math.min(window.devicePixelRatio || 2, 3);
 export const native = {
   isNative: !!P,
   async loadAll() {
-    try {
-      if (P) {
-        const r = await P.loadAll();
-        return { designs: JSON.parse(r.designs || '[]'), settings: JSON.parse(r.settings || '{}') };
-      }
-      return { designs: ls.get('designs', []), settings: ls.get('settings', {}) };
-    } catch {
-      return { designs: [], settings: {} };
-    }
+    if (P) { const r = await P.loadAll(); return { cfg: JSON.parse(r.cfg || '{}'), settings: JSON.parse(r.settings || '{}') }; }
+    return { cfg: ls.get('cfg', {}), settings: ls.get('settings', {}) };
   },
-  async saveDesigns(d) { if (P) await P.saveDesigns({ json: JSON.stringify(d) }); else ls.set('designs', d); },
+  async saveCfg(c) { if (P) await P.saveCfg({ json: JSON.stringify(c) }); else ls.set('cfg', c); },
   async saveSettings(s) { if (P) await P.saveSettings({ json: JSON.stringify(s) }); else ls.set('settings', s); },
   /** PNG data-URL того же рендера, что и на рабочем столе. W,H — размер в dp. */
-  async render(design, W, H) {
+  async render(cfg, W, H) {
     if (!P) return null;
     const dpr = DPR();
     try {
-      const r = await P.render({ design: JSON.stringify(design), width: Math.round(W * dpr), height: Math.round(H * dpr), density: dpr });
+      const r = await P.render({ cfg: JSON.stringify(cfg), width: Math.round(W * dpr), height: Math.round(H * dpr), density: dpr });
       return 'data:image/png;base64,' + r.png;
     } catch { return null; }
   },
-  async refresh(force = false) { if (P) try { await P.refresh({ force }); } catch {} },
-  async getWidgets() { if (!P) return []; try { return JSON.parse((await P.getWidgets()).widgets); } catch { return []; } },
-  async assignWidget(widgetId, designId) { if (P) await P.assignWidget({ widgetId, designId }); },
-  async pinWidget(designId, size) { return P ? (await P.pinWidget({ designId, size })).supported : false; },
+  async refresh() { if (P) try { await P.refresh(); } catch {} },
+  async checkWeather(w) { if (!P) return '—'; try { return (await P.checkWeather({ weather: JSON.stringify(w) })).message; } catch (e) { return String(e); } },
+  async saveBackground(b64) { if (P) await P.saveBackground({ data: b64 }); },
+  async removeBackground() { if (P) await P.removeBackground(); },
+  async pinWidget() { return P ? (await P.pinWidget()).supported : false; },
   async openUrl(url) { if (P) await P.openUrl({ url }); else window.open(url, '_blank'); },
-  async info() { return P ? await P.getInfo() : { version: 'web', build: '0', appId: 'web' }; },
-  async getLaunchDesign() { if (!P) return ''; try { return (await P.getLaunchDesign()).id; } catch { return ''; } },
-  onOpenDesign(cb) { if (P) P.addListener('openDesign', (e) => cb(e.id)); },
+  async info() { return P ? await P.getInfo() : { version: 'web', build: '0' }; },
   async searchCity(query, lang) {
     if (P) { try { return JSON.parse((await P.searchCity({ query, lang })).results); } catch { return []; } }
     try {

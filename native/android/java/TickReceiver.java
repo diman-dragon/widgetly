@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 
-/** Не экспортируется: срабатывает от AlarmManager (тик) и от кнопки обновления на виджете. */
+/** Не экспортируется: тик от AlarmManager и кнопка обновления на виджете. */
 public class TickReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context c, Intent i) {

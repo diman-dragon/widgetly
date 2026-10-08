@@ -1,29 +1,30 @@
 package __APP_ID__;
 
-import android.app.AlarmManager;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
-import android.os.BatteryManager;
 import android.graphics.*;
-import android.text.format.DateFormat;
-import org.json.JSONArray;
 import org.json.JSONObject;
+import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
 /**
- * Рисует виджет в Bitmap по JSON-описанию дизайна. Один и тот же код даёт и предпросмотр в редакторе,
- * и картинку для виджета на рабочем столе. Часы на самом виджете — системный TextClock (drawClock=false).
+ * Рисует виджет целиком в Bitmap по JSON-конфигу. Один код для превью в редакторе и для рабочего стола.
+ * Часы на рабочем столе — системный TextClock поверх картинки (drawClock=false), поэтому здесь
+ * заданы общие функции геометрии часов (clockRect/clockSize), по которым их ставит Updater.
  */
 final class Renderer {
     private Renderer() {}
 
     // ---------- helpers ----------
+    static JSONObject sub(JSONObject o, String k) {
+        JSONObject s = o.optJSONObject(k);
+        return s == null ? new JSONObject() : s;
+    }
+
     static int col(String hex, int alphaPct, int def) {
         try {
             int c = Color.parseColor(hex);
-            return alphaPct >= 0 ? (c & 0x00FFFFFF) | ((Math.round(alphaPct * 2.55f)) << 24) : c;
+            return alphaPct >= 0 ? (c & 0x00FFFFFF) | (Math.round(alphaPct * 2.55f) << 24) : c;
         } catch (Exception e) { return def; }
     }
 
@@ -31,19 +32,7 @@ final class Renderer {
         return Typeface.create(fam == null || fam.isEmpty() ? "sans-serif" : fam, Typeface.NORMAL);
     }
 
-    static RectF blockRect(JSONObject d, JSONObject b, int w, int h, float dens) {
-        int cols = Math.max(1, d.optInt("cols", 5)), rows = Math.max(1, d.optInt("rows", 3));
-        float pad = (float) d.optDouble("pad", 8) * dens;
-        float cw = (w - 2 * pad) / cols, ch = (h - 2 * pad) / rows;
-        int x = b.optInt("x"), y = b.optInt("y"), bw = Math.max(1, b.optInt("w", 1)), bh = Math.max(1, b.optInt("h", 1));
-        return new RectF(pad + x * cw, pad + y * ch, pad + (x + bw) * cw, pad + (y + bh) * ch);
-    }
-
-    static RectF contentRect(RectF r, float dens) {
-        RectF c = new RectF(r);
-        c.inset(5 * dens, 5 * dens);
-        return c;
-    }
+    static RectF rf(float l, float t, float r, float b) { return new RectF(l, t, r, b); }
 
     static float fitSize(Paint p, String text, float w, float h, float scale) {
         p.setTextSize(100);
@@ -62,71 +51,74 @@ final class Renderer {
         cv.drawText(text, x, r.centerY() - (fm.ascent + fm.descent) / 2, p);
     }
 
-    static final class Ln {
-        String t; float wgt, a = 1f, sc = 1f;
-        Ln(String t, float w) { this.t = t; this.wgt = w; }
-        Ln a(float v) { a = v; return this; }
+    static Paint paint(int color, float alpha, String font) {
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        p.setTypeface(tf(font));
+        p.setColor((color & 0x00FFFFFF) | ((int) (Color.alpha(color) * alpha) << 24));
+        return p;
     }
 
-    static void stack(Canvas cv, Paint p, RectF r, List<Ln> ls, String al, float scale) {
-        float tot = 0;
-        for (Ln l : ls) tot += l.wgt;
-        if (tot <= 0) return;
-        int base = p.getColor();
-        float y = r.top;
-        for (Ln l : ls) {
-            float hh = r.height() * l.wgt / tot;
-            RectF band = new RectF(r.left, y, r.right, y + hh);
-            band.inset(0, hh * 0.04f);
-            p.setColor((base & 0x00FFFFFF) | ((int) (Color.alpha(base) * l.a) << 24));
-            drawFit(cv, l.t, p, band, al, scale * l.sc);
-            y += hh;
+    static String fmt(String pat, String def, Date d, TimeZone tz) {
+        try {
+            SimpleDateFormat f = new SimpleDateFormat(pat, Locale.getDefault());
+            if (tz != null) f.setTimeZone(tz);
+            return f.format(d);
+        } catch (Exception e) {
+            return new SimpleDateFormat(def, Locale.getDefault()).format(d);
         }
-        p.setColor(base);
     }
 
-    static float alignShift(String al, float boxW, float textW) {
-        return "center".equals(al) ? (boxW - textW) / 2 : "right".equals(al) ? boxW - textW : 0;
+    static String cap(String s, boolean upper) {
+        if (s.isEmpty()) return s;
+        return upper ? s.toUpperCase(Locale.getDefault()) : s.substring(0, 1).toUpperCase(Locale.getDefault()) + s.substring(1);
     }
 
-    // ---------- clock geometry (общая для превью и TextClock) ----------
+    // ---------- геометрия ----------
+    static float split(JSONObject cfg, int w) { return w * (float) cfg.optDouble("split", 48) / 100f; }
+
+    static RectF clockRect(JSONObject cfg, int w, int h) {
+        return rf(0.06f * w, 0.08f * h, split(cfg, w) - 0.02f * w, 0.47f * h);
+    }
+
     static String clockSample(String fmt) { return fmt.contains("a") ? "00:00 PM" : "00:00"; }
 
-    /** [textSizePx, shiftPx] */
-    static float[] clockGeom(JSONObject b, RectF cr) {
-        JSONObject o = b.optJSONObject("opt");
-        String fmt = o == null ? "HH:mm" : o.optString("fmt", "HH:mm");
+    static float clockSize(JSONObject cfg, int w, int h) {
+        JSONObject ck = sub(cfg, "clock");
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setTypeface(tf(b.optString("font", "sans-serif")));
-        String sample = clockSample(fmt);
-        float size = fitSize(p, sample, cr.width(), cr.height(), (float) b.optDouble("scale", 1));
-        p.setTextSize(size);
-        return new float[]{size, alignShift(b.optString("align", "left"), cr.width(), p.measureText(sample))};
+        p.setTypeface(tf(ck.optString("font", "sans-serif-light")));
+        RectF r = clockRect(cfg, w, h);
+        return fitSize(p, clockSample(ck.optString("fmt", "HH:mm")), r.width(), r.height(), (float) ck.optDouble("scale", 1));
     }
 
     // ---------- main ----------
-    static Bitmap render(Context c, JSONObject d, int w, int h, float dens, long dateTs, boolean drawClock, boolean net) {
+    static Bitmap render(Context c, JSONObject cfg, int w, int h, float dens, long dateTs, boolean drawClock, boolean net) {
         Bitmap bmp = Bitmap.createBitmap(Math.max(1, w), Math.max(1, h), Bitmap.Config.ARGB_8888);
         Canvas cv = new Canvas(bmp);
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        float rad = (float) d.optDouble("radius", 24) * dens;
-        int c1 = col(d.optString("bg", "#15161A"), d.optInt("bgA", 85), 0xD915161A);
-        String b2 = d.optString("bg2", "");
-        if (!b2.isEmpty()) {
-            p.setShader(new LinearGradient(0, 0, w * 0.35f, h, c1, col(b2, d.optInt("bgA", 85), c1), Shader.TileMode.CLAMP));
-        } else {
-            p.setColor(c1);
+        float rad = (float) cfg.optDouble("radius", 28) * dens;
+        int alpha = Math.round(Math.max(0, Math.min(100, cfg.optInt("opacity", 92))) * 2.55f);
+        int fg = col(cfg.optString("fg", "#FFFFFF"), -1, Color.WHITE);
+        int fg2 = col(cfg.optString("fg2", "#B7BEE8"), -1, 0xFFB7BEE8);
+
+        // фон (прозрачность применяется ко всему фону, текст остаётся чётким)
+        int layer = cv.saveLayerAlpha(0, 0, w, h, alpha);
+        drawBackground(c, cv, cfg, w, h, dens);
+        Paint mask = new Paint(Paint.ANTI_ALIAS_FLAG);
+        mask.setColor(Color.BLACK);
+        mask.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
+        cv.drawRoundRect(new RectF(0, 0, w, h), rad, rad, mask);
+        cv.restoreToCount(layer);
+
+        if (cfg.optBoolean("border", true)) {
+            Paint b = new Paint(Paint.ANTI_ALIAS_FLAG);
+            b.setStyle(Paint.Style.STROKE);
+            b.setStrokeWidth(dens);
+            b.setColor((0x38 << 24) | 0xFFFFFF);
+            b.setAlpha((int) (0x38 * alpha / 255f));
+            cv.drawRoundRect(new RectF(dens / 2, dens / 2, w - dens / 2, h - dens / 2), rad, rad, b);
         }
-        cv.drawRoundRect(new RectF(0, 0, w, h), rad, rad, p);
-        JSONArray bl = d.optJSONArray("blocks");
-        if (bl == null) bl = new JSONArray();
-        int fg = col(d.optString("fg", "#FFFFFF"), -1, Color.WHITE);
-        for (int i = 0; i < bl.length(); i++) {
-            JSONObject b = bl.optJSONObject(i);
-            if (b == null) continue;
-            try { drawBlock(c, cv, d, b, w, h, dens, fg, dateTs, drawClock, net); } catch (Exception ignored) {}
-        }
-        drawDividers(cv, d, bl, w, h, dens);
+
+        try { drawLeft(cv, cfg, w, h, dens, dateTs, drawClock, fg); } catch (Exception ignored) {}
+        try { drawRight(c, cv, cfg, w, h, dens, net, fg, fg2); } catch (Exception ignored) {}
         return bmp;
     }
 
@@ -134,147 +126,198 @@ final class Renderer {
         Bitmap bmp = Bitmap.createBitmap(Math.max(1, w), Math.max(1, h), Bitmap.Config.ARGB_8888);
         Canvas cv = new Canvas(bmp);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setColor(0xD915161A);
+        p.setColor(0xD91B2147);
         cv.drawRoundRect(new RectF(0, 0, w, h), 24 * dens, 24 * dens, p);
         p.setColor(Color.WHITE);
-        RectF r = new RectF(12 * dens, 12 * dens, w - 12 * dens, h - 12 * dens);
-        drawFit(cv, msg, p, r, "center", 0.5f);
+        drawFit(cv, msg, p, rf(12 * dens, 12 * dens, w - 12 * dens, h - 12 * dens), "center", 0.5f);
         return bmp;
     }
 
-    private static void drawBlock(Context c, Canvas cv, JSONObject d, JSONObject b, int w, int h, float dens,
-                                  int fg, long dateTs, boolean drawClock, boolean net) throws Exception {
-        RectF r = blockRect(d, b, w, h, dens);
-        String bg = b.optString("bg", "");
-        if (!bg.isEmpty()) {
-            Paint q = new Paint(Paint.ANTI_ALIAS_FLAG);
-            q.setColor(col(bg, b.optInt("bgA", 30), 0));
-            RectF in = new RectF(r);
-            in.inset(2 * dens, 2 * dens);
-            float rr = (float) b.optDouble("radius", 12) * dens;
-            cv.drawRoundRect(in, rr, rr, q);
-        }
-        RectF cr = contentRect(r, dens);
-        String cs = b.optString("color", "");
-        int color = cs.isEmpty() ? fg : col(cs, -1, fg);
-        JSONObject o = b.optJSONObject("opt");
-        if (o == null) o = new JSONObject();
+    // ---------- фон ----------
+    private static void drawBackground(Context c, Canvas cv, JSONObject cfg, int w, int h, float dens) {
+        float split = split(cfg, w);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setColor(color);
-        p.setTypeface(tf(b.optString("font", "sans-serif")));
-        float sc = (float) b.optDouble("scale", 1);
-        String al = b.optString("align", "left");
-        String type = b.optString("type");
+        int c1 = col(cfg.optString("panel", "#2A3363"), -1, 0xFF2A3363);
+        int c2 = col(cfg.optString("panel2", "#171C3E"), -1, 0xFF171C3E);
+        p.setShader(new LinearGradient(split, 0, w, h, c1, c2, Shader.TileMode.CLAMP));
+        cv.drawRect(0, 0, w, h, p);
 
-        switch (type) {
-            case "clock": {
-                if (!drawClock) break;
-                SimpleDateFormat f = new SimpleDateFormat(o.optString("fmt", "HH:mm"), Locale.getDefault());
-                String tz = o.optString("tz", "");
-                if (!tz.isEmpty()) f.setTimeZone(TimeZone.getTimeZone(tz));
-                float[] g = clockGeom(b, cr);
-                p.setTextSize(g[0]);
-                Paint.FontMetrics fm = p.getFontMetrics();
-                cv.drawText(f.format(new Date()), cr.left + g[1], cr.centerY() - (fm.ascent + fm.descent) / 2, p);
-                break;
+        String mode = cfg.optString("bgMode", "sunset");
+        if (!"none".equals(mode)) {
+            float fade = 0.06f * w;
+            RectF lr = rf(0, 0, split + fade, h);
+            int ly = cv.saveLayer(0, 0, w, h, null);
+            boolean ok = false;
+            if ("photo".equals(mode)) ok = drawPhoto(c, cv, lr);
+            if (!ok) scene(cv, lr, "night".equals(mode));
+            int dim = cfg.optInt("dim", 10);
+            if (dim > 0) {
+                Paint d = new Paint();
+                d.setColor(Color.BLACK);
+                d.setAlpha(Math.round(dim * 2.55f));
+                cv.drawRect(lr, d);
             }
-            case "date": {
-                String s;
-                try { s = new SimpleDateFormat(o.optString("fmt", "EEEE, d MMMM"), Locale.getDefault()).format(new Date(dateTs)); }
-                catch (Exception e) { s = new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(new Date(dateTs)); }
-                if (o.optBoolean("upper")) s = s.toUpperCase(Locale.getDefault());
-                else if (!s.isEmpty()) s = s.substring(0, 1).toUpperCase(Locale.getDefault()) + s.substring(1);
-                drawFit(cv, s, p, cr, al, sc);
-                break;
-            }
-            case "weather": drawWeather(c, cv, p, cr, o, al, sc, net); break;
-            case "battery": drawFit(cv, batteryText(c), p, cr, al, sc); break;
-            case "alarm": drawFit(cv, "⏰ " + alarmText(c), p, cr, al, sc); break;
-            default: break;
+            Paint fm = new Paint();
+            fm.setShader(new LinearGradient(split - 0.03f * w, 0, split + fade, 0, 0xFF000000, 0x00000000, Shader.TileMode.CLAMP));
+            fm.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
+            cv.drawRect(lr, fm);
+            cv.restoreToCount(ly);
+        }
+        // разделитель левой и правой частей
+        Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
+        line.setColor(0x33FFFFFF);
+        line.setStrokeWidth(Math.max(1f, dens * 0.8f));
+        cv.drawLine(split, 0.1f * h, split, 0.9f * h, line);
+    }
+
+    private static boolean drawPhoto(Context c, Canvas cv, RectF lr) {
+        try {
+            File f = Store.bgFile(c);
+            if (!f.exists()) return false;
+            Bitmap b = BitmapFactory.decodeFile(f.getAbsolutePath());
+            if (b == null) return false;
+            float k = Math.max(lr.width() / b.getWidth(), lr.height() / b.getHeight());
+            float sw = lr.width() / k, sh = lr.height() / k;
+            Rect src = new Rect(Math.round((b.getWidth() - sw) / 2), Math.round((b.getHeight() - sh) / 2),
+                    Math.round((b.getWidth() + sw) / 2), Math.round((b.getHeight() + sh) / 2));
+            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+            cv.drawBitmap(b, src, lr, p);
+            b.recycle();
+            return true;
+        } catch (Throwable t) { return false; }
+    }
+
+    /** Встроенные «фото»: закат над бухтой и ночной вариант — рисуются кодом, без файлов. */
+    private static void scene(Canvas cv, RectF r, boolean night) {
+        float W = r.width(), H = r.height(), hz = r.top + H * 0.64f;
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        int[] sky = night ? new int[]{0xFF070B26, 0xFF1B2A6B, 0xFF4A66A8, 0xFF8FA8D8}
+                          : new int[]{0xFF5B5A9C, 0xFF9A6FB1, 0xFFE88AA2, 0xFFF7BA8C};
+        p.setShader(new LinearGradient(0, r.top, 0, hz, sky, new float[]{0, 0.4f, 0.78f, 1}, Shader.TileMode.CLAMP));
+        cv.drawRect(r.left, r.top, r.right, hz, p);
+        p.setShader(new RadialGradient(r.left + W * 0.55f, hz, H * 0.55f, night ? 0x558FA8D8 : 0x88FFC28A, 0x00FFC28A, Shader.TileMode.CLAMP));
+        cv.drawRect(r.left, r.top, r.right, hz + 1, p);
+        p.setShader(null);
+        if (night) {
+            p.setColor(0xCCFFFFFF);
+            Random rn = new Random(7);
+            for (int i = 0; i < 40; i++) cv.drawCircle(r.left + rn.nextFloat() * W, r.top + rn.nextFloat() * H * 0.5f, 0.6f + rn.nextFloat() * 1.2f, p);
+            p.setColor(0xFFF2F4FF);
+            cv.drawCircle(r.left + W * 0.78f, r.top + H * 0.2f, H * 0.05f, p);
+        }
+        p.setColor(night ? 0xFF1C2656 : 0xFF6A5A98);
+        Path m = new Path();
+        m.moveTo(r.left, hz); m.lineTo(r.left, hz - H * 0.08f);
+        m.quadTo(r.left + W * 0.2f, hz - H * 0.2f, r.left + W * 0.38f, hz - H * 0.07f);
+        m.quadTo(r.left + W * 0.55f, hz - H * 0.14f, r.left + W * 0.7f, hz - H * 0.06f);
+        m.lineTo(r.right, hz - H * 0.04f); m.lineTo(r.right, hz); m.close();
+        cv.drawPath(m, p);
+        p.setColor(night ? 0xFF111A44 : 0xFF453F7C);
+        Path m2 = new Path();
+        m2.moveTo(r.left + W * 0.45f, hz);
+        m2.quadTo(r.left + W * 0.7f, hz - H * 0.3f, r.left + W * 0.82f, hz - H * 0.25f);
+        m2.lineTo(r.right, hz - H * 0.1f); m2.lineTo(r.right, hz); m2.close();
+        cv.drawPath(m2, p);
+        p.setShader(new LinearGradient(0, hz, 0, r.bottom, night ? 0xFF2A3E80 : 0xFFEE8097, night ? 0xFF0E1538 : 0xFF3B3470, Shader.TileMode.CLAMP));
+        cv.drawRect(r.left, hz, r.right, r.bottom, p);
+        p.setShader(null);
+        p.setColor(night ? 0xFF050818 : 0xFF12163A);
+        Path s = new Path();
+        s.moveTo(r.left + W * 0.35f, r.bottom);
+        s.quadTo(r.left + W * 0.55f, r.bottom - H * 0.16f, r.right, r.bottom - H * 0.3f);
+        s.lineTo(r.right, r.bottom); s.close();
+        cv.drawPath(s, p);
+        p.setColor(0xFFFFC46B);
+        Random rn = new Random(3);
+        for (int i = 0; i < 26; i++) {
+            float x = r.left + W * (0.5f + rn.nextFloat() * 0.5f);
+            float y = r.bottom - H * (0.03f + rn.nextFloat() * 0.12f) - (x - r.left - W * 0.5f) / W * H * 0.2f;
+            cv.drawCircle(x, y, 0.8f + rn.nextFloat(), p);
         }
     }
 
-    // ---------- weather ----------
-    private static void drawWeather(Context c, Canvas cv, Paint p, RectF cr, JSONObject o, String al, float sc, boolean net) {
-        WeatherService.Data wd = WeatherService.get(c, o, net);
+    // ---------- левая часть: часы, день недели, дата ----------
+    private static void drawLeft(Canvas cv, JSONObject cfg, int w, int h, float dens, long dateTs, boolean drawClock, int fg) {
+        float split = split(cfg, w), L = 0.06f * w, R = split - 0.02f * w;
+        Date d = new Date(dateTs);
+        JSONObject ck = sub(cfg, "clock"), wd = sub(cfg, "weekday"), dt = sub(cfg, "date");
+
+        if (drawClock && ck.optBoolean("show", true)) {
+            String cs = ck.optString("color", "");
+            Paint p = paint(cs.isEmpty() ? fg : col(cs, -1, fg), 1f, ck.optString("font", "sans-serif-light"));
+            p.setShadowLayer(4 * dens, 0, 2 * dens, 0x66000000);
+            String tz = ck.optString("tz", "");
+            String s = fmt(ck.optString("fmt", "HH:mm"), "HH:mm", new Date(), tz.isEmpty() ? null : TimeZone.getTimeZone(tz));
+            p.setTextSize(clockSize(cfg, w, h));
+            RectF r = clockRect(cfg, w, h);
+            Paint.FontMetrics fm = p.getFontMetrics();
+            cv.drawText(s, r.left, r.centerY() - (fm.ascent + fm.descent) / 2, p);
+        }
+        if (wd.optBoolean("show", true)) {
+            String cs = wd.optString("color", "");
+            Paint p = paint(cs.isEmpty() ? fg : col(cs, -1, fg), 0.88f, wd.optString("font", "sans-serif"));
+            p.setShadowLayer(3 * dens, 0, 1.5f * dens, 0x66000000);
+            String s = cap(fmt(wd.optString("pattern", "EEEE"), "EEEE", d, null), wd.optBoolean("upper", false));
+            drawFit(cv, s, p, rf(L, 0.50f * h, R, 0.61f * h), "left", (float) wd.optDouble("scale", 1));
+        }
+        if (dt.optBoolean("show", true)) {
+            String cs = dt.optString("color", "");
+            Paint p = paint(cs.isEmpty() ? fg : col(cs, -1, fg), 1f, dt.optString("font", "sans-serif-medium"));
+            p.setShadowLayer(3 * dens, 0, 1.5f * dens, 0x66000000);
+            String s = fmt(dt.optString("pattern", "d MMMM yyyy"), "d MMMM yyyy", d, null);
+            drawFit(cv, s, p, rf(L, 0.62f * h, R, 0.77f * h), "left", (float) dt.optDouble("scale", 1));
+        }
+    }
+
+    // ---------- правая часть: погода ----------
+    private static void drawRight(Context c, Canvas cv, JSONObject cfg, int w, int h, float dens, boolean net, int fg, int fg2) {
+        JSONObject wc = sub(cfg, "weather");
+        if (!wc.optBoolean("show", true)) return;
+        WeatherService.Data wd = wc.has("lat") ? WeatherService.get(c, wc, net) : null;
+        float split = split(cfg, w);
+        float L = split + 0.045f * w, R = w - 0.045f * w;
+        float btnW = cfg.optBoolean("refresh", true) ? 42 * dens : 0;
+        String font = wc.optString("font", "sans-serif");
+        float sc = (float) wc.optDouble("scale", 1);
+
+        // город и страна
+        drawFit(cv, "📍 " + wc.optString("city", ""), paint(fg, 1f, font), rf(L, 0.07f * h, R - btnW, 0.16f * h), "left", sc);
+        String country = wc.optString("country", "");
+        if (wc.optBoolean("showCountry", true) && !country.isEmpty())
+            drawFit(cv, country, paint(fg2, 1f, font), rf(L, 0.165f * h, R - btnW, 0.235f * h), "left", sc);
+
+        // иконка и текущая температура
         String temp = wd == null ? "--°" : Math.round(wd.temp) + "°";
         String icon = wd == null ? "☁️" : WeatherService.emoji(wd.code, wd.day);
-        String cond = wd == null ? "" : WeatherService.text(wd.code);
-        String hilo = wd == null ? "" : "↑" + Math.round(wd.hi) + "° ↓" + Math.round(wd.lo) + "°";
-        String city = o.optString("city", "");
-        boolean horiz = cr.width() >= cr.height() * 1.5f;
-        boolean showIcon = o.optBoolean("icon", true);
-        RectF textR = new RectF(cr);
-        List<Ln> ls = new ArrayList<>();
-        if (horiz) {
-            if (showIcon) {
-                float side = Math.min(cr.height(), cr.width() * 0.4f);
-                RectF ir = new RectF(cr.left, cr.centerY() - side / 2, cr.left + side, cr.centerY() + side / 2);
-                Paint ip = new Paint(p);
-                drawFit(cv, icon, ip, ir, "center", 0.8f);
-                textR.left = ir.right + side * 0.1f;
-            }
-            ls.add(new Ln(temp, 2.2f));
-        } else {
-            if (showIcon) ls.add(new Ln(icon, 2f));
-            ls.add(new Ln(temp, 2f));
-        }
-        if (o.optBoolean("showCity", true) && !city.isEmpty()) ls.add(new Ln(city, 0.9f).a(0.85f));
-        if (o.optBoolean("showCond", true) && !cond.isEmpty()) ls.add(new Ln(cond, 0.8f).a(0.7f));
-        if (o.optBoolean("showHiLo", false) && !hilo.isEmpty()) ls.add(new Ln(hilo, 0.8f).a(0.7f));
-        stack(cv, p, textR, ls, al, sc);
-    }
+        float side = Math.min(0.17f * w, 0.27f * h);
+        drawFit(cv, icon, new Paint(Paint.ANTI_ALIAS_FLAG), rf(L, 0.38f * h - side / 2, L + side, 0.38f * h + side / 2), "center", 0.9f);
+        float tx = L + side + 0.025f * w;
+        drawFit(cv, temp, paint(fg, 1f, font), rf(tx, 0.23f * h, R, 0.42f * h), "left", sc);
+        if (wd != null && wc.optBoolean("showCond", true))
+            drawFit(cv, WeatherService.text(wd.code), paint(fg, 0.85f, font), rf(tx, 0.425f * h, R, 0.495f * h), "left", sc);
+        if (wd != null && wc.optBoolean("showHiLo", true))
+            drawFit(cv, "↑" + Math.round(wd.hi) + "°   ↓" + Math.round(wd.lo) + "°", paint(fg, 0.85f, font), rf(tx, 0.50f * h, R, 0.575f * h), "left", sc);
 
-    // ---------- battery / alarm ----------
-    static String batteryText(Context c) {
-        try {
-            Intent i = c.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
-            if (i == null) return "🔋 —";
-            int l = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1), sc = i.getIntExtra(BatteryManager.EXTRA_SCALE, 100);
-            int st = i.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
-            boolean ch = st == BatteryManager.BATTERY_STATUS_CHARGING || st == BatteryManager.BATTERY_STATUS_FULL;
-            return (ch ? "⚡ " : "🔋 ") + Math.round(l * 100f / sc) + "%";
-        } catch (Exception e) { return "🔋 —"; }
-    }
-
-    static String alarmText(Context c) {
-        try {
-            AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
-            AlarmManager.AlarmClockInfo ai = am.getNextAlarmClock();
-            if (ai == null) return "—";
-            long t = ai.getTriggerTime();
-            boolean h24 = DateFormat.is24HourFormat(c);
-            String pat = (t - System.currentTimeMillis() > 20 * 3600_000L ? "EEE " : "") + (h24 ? "HH:mm" : "h:mm a");
-            return new SimpleDateFormat(pat, Locale.getDefault()).format(new Date(t));
-        } catch (Exception e) { return "—"; }
-    }
-
-    // ---------- dividers ----------
-    private static void drawDividers(Canvas cv, JSONObject d, JSONArray bl, int w, int h, float dens) {
-        JSONObject v = d.optJSONObject("div");
-        if (v == null || !v.optBoolean("on")) return;
-        int cols = Math.max(1, d.optInt("cols", 5)), rows = Math.max(1, d.optInt("rows", 3));
-        float wd = Math.max(1f, (float) v.optDouble("wd", 1) * dens);
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setStyle(Paint.Style.STROKE);
-        p.setColor(col(v.optString("color", "#FFFFFF"), v.optInt("a", 25), 0x40FFFFFF));
-        p.setStrokeWidth(wd);
-        String st = v.optString("style", "solid");
-        if ("dashed".equals(st)) p.setPathEffect(new DashPathEffect(new float[]{6 * dens, 4 * dens}, 0));
-        else if ("dotted".equals(st)) { p.setStrokeCap(Paint.Cap.ROUND); p.setPathEffect(new DashPathEffect(new float[]{0.01f, wd * 2.5f}, 0)); }
-        float ins = (float) v.optDouble("inset", 10) * dens;
-        for (int i = 0; i < bl.length(); i++) {
-            JSONObject b = bl.optJSONObject(i);
-            if (b == null) continue;
-            RectF r = blockRect(d, b, w, h, dens);
-            Path path = new Path();
-            if (b.optBoolean("divR") && b.optInt("x") + b.optInt("w", 1) < cols) {
-                path.moveTo(r.right, r.top + ins); path.lineTo(r.right, r.bottom - ins);
-            }
-            if (b.optBoolean("divB") && b.optInt("y") + b.optInt("h", 1) < rows) {
-                path.moveTo(r.left + ins, r.bottom); path.lineTo(r.right - ins, r.bottom);
-            }
-            cv.drawPath(path, p);
+        // разделитель и прогноз на 1–3 дня вперёд
+        int n = wd == null ? 0 : Math.min(Math.min(3, wc.optInt("days", 3)), wd.days.size());
+        if (n <= 0) return;
+        Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
+        line.setColor(0x40FFFFFF);
+        line.setStrokeWidth(Math.max(1f, dens * 0.8f));
+        cv.drawLine(L, 0.605f * h, R, 0.605f * h, line);
+        float cw = (R - L) / n;
+        SimpleDateFormat in = new SimpleDateFormat("yyyy-MM-dd", Locale.US), out = new SimpleDateFormat("EEE", Locale.getDefault());
+        line.setColor(0x26FFFFFF);
+        for (int i = 0; i < n; i++) {
+            WeatherService.Day dd = wd.days.get(i);
+            float x0 = L + i * cw, x1 = x0 + cw, pad = cw * 0.06f;
+            if (i > 0) cv.drawLine(x0, 0.64f * h, x0, 0.95f * h, line);
+            String dow;
+            try { dow = out.format(in.parse(dd.date)).toUpperCase(Locale.getDefault()); } catch (Exception e) { dow = ""; }
+            drawFit(cv, dow, paint(fg, 0.9f, font), rf(x0 + pad, 0.625f * h, x1 - pad, 0.70f * h), "center", sc);
+            drawFit(cv, WeatherService.emoji(dd.code, true), new Paint(Paint.ANTI_ALIAS_FLAG), rf(x0 + pad, 0.705f * h, x1 - pad, 0.81f * h), "center", 0.95f);
+            drawFit(cv, Math.round(dd.hi) + "°", paint(fg, 1f, font), rf(x0 + pad, 0.815f * h, x1 - pad, 0.885f * h), "center", sc);
+            drawFit(cv, Math.round(dd.lo) + "°", paint(fg2, 0.8f, font), rf(x0 + pad, 0.885f * h, x1 - pad, 0.955f * h), "center", sc);
         }
     }
 }

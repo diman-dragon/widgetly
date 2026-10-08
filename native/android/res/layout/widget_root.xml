@@ -10,8 +10,8 @@
         android:layout_height="match_parent"
         android:scaleType="fitXY" />
 
-    <!-- Часы: системный TextClock, сам обновляется каждую минуту без участия приложения.
-         Шрифт задаётся в XML, поэтому на каждое семейство своя копия; нужная включается из кода. -->
+    <!-- Часы — системный TextClock: сам тикает каждую минуту, без запуска приложения.
+         Шрифт задаётся в XML, поэтому по копии на семейство; нужная включается из кода. -->
     <FrameLayout
         android:id="@+id/clock_host"
         android:layout_width="match_parent"
@@ -27,6 +27,10 @@
             android:maxLines="1"
             android:textColor="#FFFFFF"
             android:textSize="40sp"
+            android:shadowColor="#66000000"
+            android:shadowDx="0"
+            android:shadowDy="2"
+            android:shadowRadius="4"
             android:format12Hour="h:mm"
             android:format24Hour="HH:mm"
             android:visibility="gone" />
@@ -40,6 +44,10 @@
             android:maxLines="1"
             android:textColor="#FFFFFF"
             android:textSize="40sp"
+            android:shadowColor="#66000000"
+            android:shadowDx="0"
+            android:shadowDy="2"
+            android:shadowRadius="4"
             android:format12Hour="h:mm"
             android:format24Hour="HH:mm"
             android:visibility="gone" />
@@ -53,6 +61,10 @@
             android:maxLines="1"
             android:textColor="#FFFFFF"
             android:textSize="40sp"
+            android:shadowColor="#66000000"
+            android:shadowDx="0"
+            android:shadowDy="2"
+            android:shadowRadius="4"
             android:format12Hour="h:mm"
             android:format24Hour="HH:mm"
             android:visibility="gone" />
@@ -66,6 +78,10 @@
             android:maxLines="1"
             android:textColor="#FFFFFF"
             android:textSize="40sp"
+            android:shadowColor="#66000000"
+            android:shadowDx="0"
+            android:shadowDy="2"
+            android:shadowRadius="4"
             android:format12Hour="h:mm"
             android:format24Hour="HH:mm"
             android:visibility="gone" />
@@ -79,6 +95,10 @@
             android:maxLines="1"
             android:textColor="#FFFFFF"
             android:textSize="40sp"
+            android:shadowColor="#66000000"
+            android:shadowDx="0"
+            android:shadowDy="2"
+            android:shadowRadius="4"
             android:format12Hour="h:mm"
             android:format24Hour="HH:mm"
             android:visibility="gone" />
@@ -92,6 +112,10 @@
             android:maxLines="1"
             android:textColor="#FFFFFF"
             android:textSize="40sp"
+            android:shadowColor="#66000000"
+            android:shadowDx="0"
+            android:shadowDy="2"
+            android:shadowRadius="4"
             android:format12Hour="h:mm"
             android:format24Hour="HH:mm"
             android:visibility="gone" />
@@ -105,6 +129,10 @@
             android:maxLines="1"
             android:textColor="#FFFFFF"
             android:textSize="40sp"
+            android:shadowColor="#66000000"
+            android:shadowDx="0"
+            android:shadowDy="2"
+            android:shadowRadius="4"
             android:format12Hour="h:mm"
             android:format24Hour="HH:mm"
             android:visibility="gone" />
@@ -118,6 +146,10 @@
             android:maxLines="1"
             android:textColor="#FFFFFF"
             android:textSize="40sp"
+            android:shadowColor="#66000000"
+            android:shadowDx="0"
+            android:shadowDy="2"
+            android:shadowRadius="4"
             android:format12Hour="h:mm"
             android:format24Hour="HH:mm"
             android:visibility="gone" />
@@ -131,6 +163,10 @@
             android:maxLines="1"
             android:textColor="#FFFFFF"
             android:textSize="40sp"
+            android:shadowColor="#66000000"
+            android:shadowDx="0"
+            android:shadowDy="2"
+            android:shadowRadius="4"
             android:format12Hour="h:mm"
             android:format24Hour="HH:mm"
             android:visibility="gone" />
@@ -144,49 +180,28 @@
             android:maxLines="1"
             android:textColor="#FFFFFF"
             android:textSize="40sp"
+            android:shadowColor="#66000000"
+            android:shadowDx="0"
+            android:shadowDy="2"
+            android:shadowRadius="4"
             android:format12Hour="h:mm"
             android:format24Hour="HH:mm"
             android:visibility="gone" />
     </FrameLayout>
 
-    <ImageView
-        android:id="@+id/btn_tl"
-        android:layout_width="34dp"
-        android:layout_height="34dp"
-        android:layout_gravity="top|start"
-        android:layout_margin="2dp"
-        android:padding="8dp"
-        android:src="@drawable/ic_refresh"
-        android:contentDescription="@string/ws_refresh"
-        android:visibility="gone" />
-    <ImageView
-        android:id="@+id/btn_tr"
-        android:layout_width="34dp"
-        android:layout_height="34dp"
-        android:layout_gravity="top|end"
-        android:layout_margin="2dp"
-        android:padding="8dp"
-        android:src="@drawable/ic_refresh"
-        android:contentDescription="@string/ws_refresh"
-        android:visibility="gone" />
-    <ImageView
-        android:id="@+id/btn_bl"
-        android:layout_width="34dp"
-        android:layout_height="34dp"
-        android:layout_gravity="bottom|start"
-        android:layout_margin="2dp"
-        android:padding="8dp"
-        android:src="@drawable/ic_refresh"
-        android:contentDescription="@string/ws_refresh"
-        android:visibility="gone" />
-    <ImageView
-        android:id="@+id/btn_br"
-        android:layout_width="34dp"
-        android:layout_height="34dp"
-        android:layout_gravity="bottom|end"
-        android:layout_margin="2dp"
-        android:padding="8dp"
-        android:src="@drawable/ic_refresh"
-        android:contentDescription="@string/ws_refresh"
-        android:visibility="gone" />
+    <FrameLayout
+        android:id="@+id/btn_host"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+        <ImageView
+            android:id="@+id/btn_refresh"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_gravity="top|end"
+            android:padding="9dp"
+            android:background="@drawable/ws_btn_bg"
+            android:src="@drawable/ic_refresh"
+            android:contentDescription="@string/ws_refresh"
+            android:visibility="gone" />
+    </FrameLayout>
 </FrameLayout>
