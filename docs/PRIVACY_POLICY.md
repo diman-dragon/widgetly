@@ -1,8 +1,8 @@
-# Privacy Policy — Widget Studio
+# Privacy Policy — DataLaw
 
 _Last updated: <DATE>_
 
-Widget Studio ("the app") lets you customize a home-screen widget showing a clock, date, weekday and a weather forecast.
+DataLaw ("the app") lets you customize a home-screen widget showing a clock, date, weekday, a weather forecast and upcoming calendar events.
 
 ## Data we collect
 We do not run servers, do not require an account and do not collect, sell or share personal data. There is no advertising and no analytics.
@@ -13,8 +13,11 @@ Widget settings, a cached weather reading and, if you choose one, your backgroun
 ## Network requests
 To show weather the app sends the latitude/longitude of the city you selected (and your API key, if the provider needs one) to the weather service you chose: Open-Meteo (https://open-meteo.com/), MET Norway (https://api.met.no/), OpenWeatherMap (https://openweathermap.org/) or WeatherAPI.com (https://www.weatherapi.com/). Requests are made at most once every 6 hours. When you search for a city, the text you type is sent to the Open-Meteo geocoding service. These providers receive your IP address as part of any internet request and handle it under their own policies. No other data is sent.
 
-## Permissions
-The app requests no sensitive permissions. It does not read your notifications, contacts, files or location.
+## Calendar access
+If you allow it, the app reads the titles and times of your upcoming calendar events (read-only) to display them in the widget. This is processed on your device only; events are not stored by the app beyond drawing the widget, are never transmitted anywhere and are not shared. You can revoke access at any time in Android Settings → Apps → DataLaw → Permissions.
+
+## Other permissions
+The app does not use your device location, contacts, files, microphone or camera. If you choose a background photo, it is copied into the app's private storage and never leaves the device.
 
 ## Children
 The app is not directed to children under 13.

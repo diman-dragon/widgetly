@@ -5,7 +5,7 @@ import { FONTS, CLOCK_FMT, DATE_FMT, WEEKDAY_FMT, PREVIEW, SERVICES, KEY_URL, de
 const PRIVACY_URL = 'https://example.com/widget-studio/privacy'; // TODO: свой URL перед публикацией
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const S = { cfg: defaultCfg(), settings: defaultSettings(), screen: 'home', open: new Set(['look']), cities: [], hasPhoto: false };
+const S = { cfg: defaultCfg(), settings: defaultSettings(), screen: 'home', open: new Set(['look']), cities: [], hasPhoto: false, count: 0, calGranted: false };
 const app = $('#app');
 
 // ---------- хранение / тема / навигация ----------
@@ -53,17 +53,23 @@ const fontOpts = FONTS.map(([v, l]) => [v, l]);
 // ---------- главный экран ----------
 function Home() {
   app.innerHTML = `
-  <header class="bar"><h1>Widget Studio</h1><button class="icon" id="gear" aria-label="${t('settings')}">⚙️</button></header>
+  <header class="bar"><div class="brand"><img class="logo" src="img/datalaw-logo.png" alt=""><h1>DataLaw</h1></div><button class="icon" id="gear" aria-label="${t('settings')}">⚙️</button></header>
   <div class="pvwrap"><div id="pv"><img id="pvimg" alt=""></div></div>
   <div class="chips">${Object.keys(PREVIEW).map((k) => `<button data-prev="${k}" class="${k === S.settings.preview ? 'on' : ''}">${k.replace('x', '×')}</button>`).join('')}</div>
   ${native.isNative ? '' : `<p class="mu" style="padding:0 14px">${t('previewOnly')}</p>`}
   <main>
-    <button class="primary wide" id="pin" style="margin-top:8px">＋ ${t('addHome')}</button>
+    <button class="primary wide" id="pin" style="margin-top:8px"></button>
+    <p class="msg" id="msg"></p>
     <div id="secs"></div>
   </main>
   <input type="file" id="file" accept="image/*" hidden>`;
   $('#gear').onclick = () => nav('settings');
-  $('#pin').onclick = async () => { if (!(await native.pinWidget())) alert(t('pinFail')); };
+  $('#pin').onclick = async () => {
+    const r = await native.pinWidget();
+    if (r.exists) msg(t('updated'));
+    else if (!r.supported) alert(t('pinFail'));
+    await refreshState();
+  };
   app.querySelectorAll('[data-prev]').forEach((b) => (b.onclick = () => {
     S.settings.preview = b.dataset.prev; native.saveSettings(S.settings);
     app.querySelectorAll('[data-prev]').forEach((x) => x.classList.toggle('on', x === b));
@@ -74,8 +80,19 @@ function Home() {
   secs.onclick = onAct;
   secs.addEventListener('toggle', (e) => { const d = e.target; if (d.dataset && d.dataset.sec) d.open ? S.open.add(d.dataset.sec) : S.open.delete(d.dataset.sec); }, true);
   $('#file').onchange = (e) => e.target.files[0] && pickPhoto(e.target.files[0]);
-  drawSecs(); setPvRatio(); renderPv();
+  drawSecs(); setPvRatio(); renderPv(); pinLabel(); refreshState();
 }
+
+function pinLabel() { const b = $('#pin'); if (b) b.textContent = S.count > 0 ? `↻ ${t('updateWidget')}` : `＋ ${t('addHome')}`; }
+function msg(text) { const m = $('#msg'); if (!m) return; m.textContent = text; setTimeout(() => { if (m.textContent === text) m.textContent = ''; }, 3500); }
+// Число виджетов на рабочем столе и состояние доступа к календарю (после возврата из системных настроек — тоже)
+async function refreshState() {
+  const [n, g] = await Promise.all([native.widgetCount(), native.calendarState()]);
+  const changed = g !== S.calGranted;
+  S.count = n; S.calGranted = g; pinLabel();
+  if (changed && S.screen === 'home' && $('#secs')) { drawSecs(); renderPv(); }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && S.screen === 'home') refreshState(); });
 
 function setPvRatio() { const [W, H] = PREVIEW[S.settings.preview] || PREVIEW['5x3']; $('#pv').style.aspectRatio = `${W} / ${H}`; }
 
@@ -99,6 +116,12 @@ function drawSecs() {
       chk('date.show', t('show')) +
       f(t('fmt'), `<input data-p="date.pattern" list="dfl" value="${esc(S.cfg.date.pattern)}"><datalist id="dfl">${DATE_FMT.map((x) => `<option value="${x}">`).join('')}</datalist>`) +
       f(t('font'), sel('date.font', fontOpts)) + f(t('size'), rng('date.scale', 0.4, 1, 0.05)) + colorRow('date.color', 'fg')) +
+    sec('calendar', t('calendar'),
+      chk('calendar.show', t('show')) +
+      (native.isNative && !S.calGranted ? `<p class="mu">${t('calNeed')}</p><div class="row" style="margin-top:0"><button class="sm primary" data-act="calgrant">${t('calGrant')}</button></div>` : '') +
+      f(t('calDays'), sel('calendar.days', [[1, t('calToday')], [2, '2 ' + t('dayShort')], [3, '3 ' + t('dayShort')], [7, '7 ' + t('dayShort')]])) +
+      f(t('font'), sel('calendar.font', fontOpts)) + f(t('size'), rng('calendar.scale', 0.4, 1, 0.05)) + colorRow('calendar.color', 'fg') +
+      `<p class="mu">${t('calHint')}</p>`) +
     sec('weather', t('weather'),
       chk('weather.show', t('show')) +
       f(t('service'), sel('weather.service', SERVICES)) +
@@ -114,7 +137,7 @@ function drawSecs() {
       `<p class="mu">${t('weatherNote')}</p>`);
 }
 
-const NUM = new Set(['opacity', 'radius', 'dim', 'split', 'clock.scale', 'weekday.scale', 'date.scale', 'weather.scale', 'weather.days', 'weather.hours']);
+const NUM = new Set(['opacity', 'radius', 'dim', 'split', 'clock.scale', 'weekday.scale', 'date.scale', 'weather.scale', 'weather.days', 'weather.hours', 'calendar.scale', 'calendar.days']);
 function onField(e) {
   const el = e.target, p = el.dataset.p;
   if (!p) return;
@@ -136,6 +159,12 @@ async function onAct(e) {
   if (!bt) return;
   const act = bt.dataset.act;
   if (act === 'clr') { set(bt.dataset.p, ''); drawSecs(); touch(); }
+  else if (act === 'calgrant') {
+    const ok = await native.calendarRequest();
+    S.calGranted = ok;
+    if (!ok && confirm(t('calDenied'))) native.openAppSettings();
+    drawSecs(); renderPv(); native.refresh(true);
+  }
   else if (act === 'photo') $('#file').click();
   else if (act === 'rmphoto') { await native.removeBackground(); S.hasPhoto = false; S.cfg.bgMode = 'sunset'; S.cfg.photoRev = Date.now(); drawSecs(); touch(); }
   else if (act === 'check') { $('#chk').textContent = '…'; $('#chk').textContent = await native.checkWeather(S.cfg.weather); renderPv(); }
@@ -171,8 +200,10 @@ async function Settings() {
     <h2>${t('updates')}</h2><div class="panel"><p class="mu" style="margin:0">${t('updatesText')}</p></div>
     <h2>${t('about')}</h2>
     <div class="panel">
+      <div class="aboutlogo"><img class="logo" src="img/datalaw-logo.png" alt=""><b>DataLaw</b></div>
       <div class="f"><span>${t('version')}</span><b>${esc(info.version)} (${esc(info.build)})</b></div>
       <div class="row"><button class="sm" data-act="priv">${t('privacy')}</button><button class="sm danger" data-act="wipe">${t('wipe')}</button></div>
+      <p class="mu">© ${new Date().getFullYear()} DataLaw. ${t('rights')}</p>
     </div>
   </main>`;
   $('#back').onclick = () => history.back();

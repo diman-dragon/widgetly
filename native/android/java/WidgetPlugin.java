@@ -1,5 +1,6 @@
 package __APP_ID__;
 
+import android.Manifest;
 import android.appwidget.AppWidgetManager;
 import android.content.ComponentName;
 import android.content.Context;
@@ -7,18 +8,23 @@ import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.graphics.Bitmap;
 import android.net.Uri;
+import android.provider.Settings;
 import android.util.Base64;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 
-@CapacitorPlugin(name = "WidgetBridge")
+@CapacitorPlugin(name = "WidgetBridge", permissions = {
+        @Permission(alias = "calendar", strings = {Manifest.permission.READ_CALENDAR})
+})
 public class WidgetPlugin extends Plugin {
 
     private Context ctx() { return getContext().getApplicationContext(); }
@@ -62,10 +68,11 @@ public class WidgetPlugin extends Plugin {
         }
     }
 
-    /** Перерисовать виджеты на рабочем столе (погода — только если кэш старше интервала). */
+    /** Перерисовать уже стоящие на рабочем столе виджеты (погода — только если кэш старше интервала). */
     @PluginMethod
     public void refresh(PluginCall call) {
-        Updater.updateAll(ctx(), Updater.SYSTEM);
+        boolean force = Boolean.TRUE.equals(call.getBoolean("force", false));
+        Updater.updateAll(ctx(), force ? Updater.FORCE : Updater.SYSTEM);
         call.resolve();
     }
 
@@ -83,7 +90,8 @@ public class WidgetPlugin extends Plugin {
     public void saveBackground(PluginCall call) {
         try {
             byte[] bytes = Base64.decode(call.getString("data", ""), Base64.DEFAULT);
-            try (FileOutputStream fo = new FileOutputStream(Store.bgFile(ctx()))) { fo.write(bytes); }
+            FileOutputStream fo = new FileOutputStream(Store.bgFile(ctx()));
+            try { fo.write(bytes); } finally { fo.close(); }
             Store.putLong(ctx(), "bgRev", System.currentTimeMillis());
             call.resolve();
         } catch (Exception e) { call.reject(String.valueOf(e.getMessage())); }
@@ -96,16 +104,68 @@ public class WidgetPlugin extends Plugin {
         call.resolve();
     }
 
-    /** Системный диалог «добавить виджет на рабочий стол» (Android 8+). */
+    /** Сколько виджетов уже стоит на рабочем столе. */
+    @PluginMethod
+    public void widgetCount(PluginCall call) {
+        AppWidgetManager m = AppWidgetManager.getInstance(ctx());
+        JSObject o = new JSObject();
+        o.put("count", m.getAppWidgetIds(new ComponentName(ctx(), WidgetProvider.class)).length);
+        call.resolve(o);
+    }
+
+    /**
+     * Добавить на рабочий стол. Если виджет уже стоит — новый НЕ создаём, а обновляем существующий.
+     */
     @PluginMethod
     public void pinWidget(PluginCall call) {
         try {
             AppWidgetManager m = AppWidgetManager.getInstance(ctx());
+            JSObject o = new JSObject();
+            if (m.getAppWidgetIds(new ComponentName(ctx(), WidgetProvider.class)).length > 0) {
+                Updater.updateAll(ctx(), Updater.FORCE);
+                o.put("exists", true);
+                o.put("supported", true);
+                call.resolve(o);
+                return;
+            }
             boolean ok = android.os.Build.VERSION.SDK_INT >= 26 && m.isRequestPinAppWidgetSupported()
                     && m.requestPinAppWidget(new ComponentName(ctx(), WidgetProvider.class), null, null);
-            JSObject o = new JSObject();
+            o.put("exists", false);
             o.put("supported", ok);
             call.resolve(o);
+        } catch (Exception e) { call.reject(String.valueOf(e.getMessage())); }
+    }
+
+    // ---------- календарь: разрешение READ_CALENDAR запрашивается только по кнопке в настройках ----------
+    @PluginMethod
+    public void calendarState(PluginCall call) {
+        JSObject o = new JSObject();
+        o.put("granted", CalendarService.granted(ctx()));
+        call.resolve(o);
+    }
+
+    @PluginMethod
+    public void calendarRequest(PluginCall call) {
+        if (CalendarService.granted(ctx())) { calendarCb(call); return; }
+        requestPermissionForAlias("calendar", call, "calendarCb");
+    }
+
+    @PermissionCallback
+    private void calendarCb(PluginCall call) {
+        boolean g = CalendarService.granted(ctx());
+        if (g) Updater.async(ctx(), Updater.FORCE, null);
+        JSObject o = new JSObject();
+        o.put("granted", g);
+        call.resolve(o);
+    }
+
+    @PluginMethod
+    public void openAppSettings(PluginCall call) {
+        try {
+            Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + ctx().getPackageName()));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(i);
+            call.resolve();
         } catch (Exception e) { call.reject(String.valueOf(e.getMessage())); }
     }
 
@@ -127,6 +187,7 @@ public class WidgetPlugin extends Plugin {
         } catch (Exception e) { call.reject(String.valueOf(e.getMessage())); }
     }
 
+    @SuppressWarnings("deprecation")
     @PluginMethod
     public void getInfo(PluginCall call) {
         try {

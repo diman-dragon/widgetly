@@ -24,6 +24,7 @@ export function defaultCfg() {
     clock: { show: true, fmt: 'HH:mm', font: 'sans-serif-light', scale: 1, color: '', tz: '' },
     weekday: { show: true, pattern: 'EEEE', font: 'sans-serif', scale: 1, color: '', upper: false },
     date: { show: true, pattern: 'd MMMM yyyy', font: 'sans-serif-medium', scale: 1, color: '' },
+    calendar: { show: true, days: 2, font: 'sans-serif', scale: 1, color: '' },
     weather: {
       show: true, service: 'openmeteo', apiKey: '', city: 'London', country: 'United Kingdom', lat: 51.5085, lon: -0.1257,
       units: 'c', days: 3, hours: 6, showCountry: true, showCond: true, showHiLo: true, font: 'sans-serif', scale: 1,

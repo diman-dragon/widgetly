@@ -35,11 +35,16 @@ export const native = {
       return 'data:image/png;base64,' + r.png;
     } catch { return null; }
   },
-  async refresh() { if (P) try { await P.refresh(); } catch {} },
+  async refresh(force = false) { if (P) try { await P.refresh({ force }); } catch {} },
   async checkWeather(w) { if (!P) return '—'; try { return (await P.checkWeather({ weather: JSON.stringify(w) })).message; } catch (e) { return String(e); } },
   async saveBackground(b64) { if (P) await P.saveBackground({ data: b64 }); },
   async removeBackground() { if (P) await P.removeBackground(); },
-  async pinWidget() { return P ? (await P.pinWidget()).supported : false; },
+  /** {supported, exists}: exists=true — виджет уже стоит, новый не создаётся, существующий обновляется. */
+  async pinWidget() { return P ? await P.pinWidget() : { supported: false, exists: false }; },
+  async widgetCount() { return P ? (await P.widgetCount()).count : 0; },
+  async calendarState() { return P ? (await P.calendarState()).granted : false; },
+  async calendarRequest() { return P ? (await P.calendarRequest()).granted : false; },
+  async openAppSettings() { if (P) await P.openAppSettings(); },
   async openUrl(url) { if (P) await P.openUrl({ url }); else window.open(url, '_blank'); },
   async info() { return P ? await P.getInfo() : { version: 'web', build: '0' }; },
   async searchCity(query, lang) {

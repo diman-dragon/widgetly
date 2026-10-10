@@ -209,6 +209,37 @@
             android:visibility="gone" />
     </FrameLayout>
 
+    <!-- Зона нажатия на часы (в RemoteViews нельзя использовать View, поэтому FrameLayout) -->
+    <FrameLayout
+        android:id="@+id/tap_clock_host"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+        <FrameLayout
+            android:id="@+id/tap_clock"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </FrameLayout>
+
+    <!-- События календаря: страницы по 2 строки; ViewFlipper листает их сам, без участия приложения -->
+    <FrameLayout
+        android:id="@+id/cal_host"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+        <ViewFlipper
+            android:id="@+id/cal_flipper"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:autoStart="true"
+            android:flipInterval="4000"
+            android:inAnimation="@android:anim/fade_in"
+            android:outAnimation="@android:anim/fade_out" />
+        <FrameLayout
+            android:id="@+id/tap_cal"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </FrameLayout>
+
     <FrameLayout
         android:id="@+id/btn_host"
         android:layout_width="match_parent"

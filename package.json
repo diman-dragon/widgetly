@@ -1,12 +1,13 @@
 {
-  "name": "widget-studio",
-  "version": "3.0.5",
+  "name": "datalaw-widget",
+  "version": "4.0.0",
   "private": true,
-  "description": "Android home-screen widget builder (Capacitor)",
+  "description": "DataLaw — clock, weather and calendar home-screen widget (Capacitor 8)",
   "scripts": {
     "android:setup": "node scripts/setup-android.js",
     "android:open": "npx cap open android",
-    "web": "npx serve www"
+    "web": "npx serve www",
+    "android:release": "node scripts/setup-android.js && cd android && ./gradlew bundleRelease"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
@@ -15,5 +16,7 @@
   "devDependencies": {
     "@capacitor/cli": "^8.0.0"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  }
 }

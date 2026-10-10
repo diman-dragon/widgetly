@@ -12,18 +12,23 @@ import android.graphics.Bitmap;
 import android.graphics.RectF;
 import android.os.Bundle;
 import android.os.PowerManager;
+import android.provider.AlarmClock;
 import android.util.TypedValue;
 import android.view.View;
 import android.widget.RemoteViews;
 import org.json.JSONObject;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.List;
 
 /**
  * Политика обновления:
  *  - часы:   системный TextClock, сам каждую минуту (секунд нет);
  *  - дата/день недели: раз в сутки — на первом «тике» с включённым экраном после смены дня;
- *  - погода: не чаще раза в 6/12/24 часа (по настройке), только при включённом экране; прогноз приходит тем же запросом;
+ *  - погода: не чаще раза в 6/12/24 часа, только при включённом экране; прогноз приходит тем же запросом;
+ *  - календарь: перечитывается на «тике» (раз в 5 минут, экран включён); страницы по 2 строки листает ViewFlipper;
  *  - при выключенном экране ничего не рисуется и устройство не будится (не-wakeup будильник).
+ * Все виджеты обновляются «на месте»: никаких новых экземпляров не создаётся.
  */
 final class Updater {
     private Updater() {}
@@ -70,9 +75,11 @@ final class Updater {
     // ---------- запуск ----------
     static void async(final Context c, final int mode, final BroadcastReceiver.PendingResult pr) {
         final Context app = c.getApplicationContext();
-        new Thread(() -> {
-            try { updateAll(app, mode); } catch (Throwable ignored) {}
-            finally { if (pr != null) pr.finish(); }
+        new Thread(new Runnable() {
+            @Override public void run() {
+                try { updateAll(app, mode); } catch (Throwable ignored) {}
+                finally { if (pr != null) pr.finish(); }
+            }
         }).start();
     }
 
@@ -97,6 +104,11 @@ final class Updater {
         return x.get(Calendar.YEAR) == y.get(Calendar.YEAR) && x.get(Calendar.DAY_OF_YEAR) == y.get(Calendar.DAY_OF_YEAR);
     }
 
+    /**
+     * Размеры: [0],[1] — размер картинки (может быть уменьшен по лимиту памяти RemoteViews),
+     * [2],[3] — реальный размер виджета в пикселях (по нему ставятся часы и зоны нажатия).
+     * densOut[0] — плотность для картинки, densOut[1] — реальная плотность.
+     */
     static int[] sizePx(Context c, AppWidgetManager m, int id, float[] densOut) {
         Bundle o = m.getAppWidgetOptions(id);
         float dens = c.getResources().getDisplayMetrics().density;
@@ -109,23 +121,26 @@ final class Updater {
         }
         if (wdp <= 0 || hdp <= 0) { wdp = 320; hdp = 180; }
         float w = wdp * dens, h = hdp * dens;
-        float limit = 1_400_000f; // лимит памяти RemoteViews
-        if (w * h > limit) { float k = (float) Math.sqrt(limit / (w * h)); w *= k; h *= k; dens *= k; }
-        densOut[0] = dens;
-        return new int[]{Math.round(w), Math.round(h)};
+        int rw = Math.round(w), rh = Math.round(h);
+        float bd = dens;
+        float limit = 1_200_000f; // лимит памяти RemoteViews (картинка + страницы календаря)
+        if (w * h > limit) { float k = (float) Math.sqrt(limit / (w * h)); w *= k; h *= k; bd *= k; }
+        densOut[0] = bd;
+        densOut[1] = dens;
+        return new int[]{Math.round(w), Math.round(h), rw, rh};
     }
 
     private static void updateOne(Context c, AppWidgetManager m, int id, int mode) throws Exception {
         long now = System.currentTimeMillis();
         JSONObject cfg = Store.cfg(c);
-        float[] dens = new float[1];
-        int[] wh = sizePx(c, m, id, dens);
+        float[] dens = new float[2];
+        int[] sz = sizePx(c, m, id, dens);
 
         // дата — раз в сутки
         long dts = Store.getLong(c, "dateTs_" + id, 0);
         if (mode == FORCE || !sameDay(dts, now)) { dts = now; Store.putLong(c, "dateTs_" + id, dts); }
 
-        // погода — по интервалу (не меньше 6 ч), только при включённом экране (тик/система/кнопка — всегда с экрана)
+        // погода — по интервалу (не меньше 6 ч)
         JSONObject wc = Renderer.sub(cfg, "weather");
         StringBuilder sig = new StringBuilder();
         if (wc.optBoolean("show", true) && wc.has("lat")) {
@@ -133,34 +148,56 @@ final class Updater {
             WeatherService.Data wd = WeatherService.ensure(c, wc, false, interval);
             sig.append(wd == null ? "x" : wd.ts + ":" + Math.round(wd.temp));
         }
-        sig.append('|').append(cfg.toString().hashCode()).append('|').append(dts / 86400000L).append('|').append(wh[0]).append('x').append(wh[1]);
+
+        // календарь
+        JSONObject cal = Renderer.sub(cfg, "calendar");
+        List<CalendarService.Ev> evs = cal.optBoolean("show", true)
+                ? CalendarService.list(c, cal.optInt("days", 2)) : new ArrayList<CalendarService.Ev>();
+        sig.append("|ev:").append(CalendarService.signature(evs));
+
+        sig.append('|').append(cfg.toString().hashCode()).append('|').append(dts / 86400000L).append('|').append(sz[0]).append('x').append(sz[1]);
         sig.append('|').append(Store.getLong(c, "bgRev", 0));
-        sig.append('|').append(java.util.TimeZone.getDefault().getID()); // смена пояса → перерисовка
+        sig.append('|').append(java.util.TimeZone.getDefault().getID());
         String sg = sig.toString();
         if (mode != FORCE && sg.equals(Store.getString(c, "sig_" + id, ""))) return;
 
-        Bitmap bmp = Renderer.render(c, cfg, wh[0], wh[1], dens[0], dts, false, false);
-        m.updateAppWidget(id, build(c, id, cfg, bmp, wh[0], wh[1]));
+        Bitmap bmp = Renderer.render(c, cfg, sz[0], sz[1], dens[0], dts, false, false);
+        List<Bitmap> strips = new ArrayList<>();
+        RectF area = Renderer.calRect(cfg, sz[0], sz[1]);
+        for (List<CalendarService.Ev> page : CalendarService.pages(evs)) strips.add(Renderer.eventStrip(cfg, page, area, dens[0]));
+        m.updateAppWidget(id, build(c, id, cfg, bmp, strips, sz[2], sz[3]));
         Store.putString(c, "sig_" + id, sg);
     }
 
-    private static RemoteViews build(Context c, int id, JSONObject cfg, Bitmap bmp, int w, int h) {
+    private static PendingIntent activityPi(Context c, int code, Intent i) {
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        return PendingIntent.getActivity(c, code, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+    }
+
+    /** Если подходящего приложения нет (часы/календарь) — открываем наше приложение. */
+    private static Intent orApp(Context c, Intent wanted) {
+        try {
+            if (wanted.resolveActivity(c.getPackageManager()) != null) return wanted;
+        } catch (Exception ignored) {}
+        Intent launch = c.getPackageManager().getLaunchIntentForPackage(c.getPackageName());
+        return launch != null ? launch : wanted;
+    }
+
+    private static RemoteViews build(Context c, int id, JSONObject cfg, Bitmap bmp, List<Bitmap> strips, int rw, int rh) {
         RemoteViews rv = new RemoteViews(c.getPackageName(), R.layout.widget_root);
         rv.setImageViewBitmap(R.id.bg_image, bmp);
 
         // тап по виджету — открыть приложение
         Intent launch = c.getPackageManager().getLaunchIntentForPackage(c.getPackageName());
-        if (launch != null) {
-            rv.setOnClickPendingIntent(R.id.widget_root, PendingIntent.getActivity(c, id, launch,
-                    PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));
-        }
+        if (launch != null) rv.setOnClickPendingIntent(R.id.widget_root, activityPi(c, id * 10, launch));
 
-        // часы (TextClock)
+        // часы (TextClock) + тап «открыть часы»
         JSONObject ck = Renderer.sub(cfg, "clock");
+        RectF r = Renderer.clockRect(cfg, rw, rh);
         if (!ck.optBoolean("show", true)) {
             rv.setViewVisibility(R.id.clock_host, View.GONE);
+            rv.setViewVisibility(R.id.tap_clock_host, View.GONE);
         } else {
-            RectF r = Renderer.clockRect(cfg, w, h);
             String fmt = ck.optString("fmt", "HH:mm"), tz = ck.optString("tz", "");
             int fam = 1;
             for (int i = 0; i < FAMILIES.length; i++) if (FAMILIES[i].equals(ck.optString("font", "sans-serif-light"))) fam = i;
@@ -168,23 +205,43 @@ final class Updater {
             String cs = ck.optString("color", "");
             int color = cs.isEmpty() ? fg : Renderer.col(cs, -1, fg);
             rv.setViewVisibility(R.id.clock_host, View.VISIBLE);
-            // справа отступ 0: текст прижат влево и сам укладывается в блок, лишней ширины хватает, чтобы ничего не обрезалось
-            rv.setViewPadding(R.id.clock_host, Math.round(r.left), Math.round(r.top), 0, Math.round(h - r.bottom));
+            // справа отступ 0: текст прижат влево и сам укладывается в блок
+            rv.setViewPadding(R.id.clock_host, Math.round(r.left), Math.round(r.top), 0, Math.round(rh - r.bottom));
             for (int i = 0; i < CLK.length; i++) rv.setViewVisibility(CLK[i], i == fam ? View.VISIBLE : View.GONE);
             int cid = CLK[fam];
             rv.setCharSequence(cid, "setFormat12Hour", fmt);
             rv.setCharSequence(cid, "setFormat24Hour", fmt);
-            // часовой пояс задаём всегда: свой или текущий пояс устройства
             rv.setString(cid, "setTimeZone", tz.isEmpty() ? java.util.TimeZone.getDefault().getID() : tz);
             rv.setTextColor(cid, color);
-            rv.setTextViewTextSize(cid, TypedValue.COMPLEX_UNIT_PX, Renderer.clockSize(cfg, w, h));
+            rv.setTextViewTextSize(cid, TypedValue.COMPLEX_UNIT_PX, Renderer.clockSize(cfg, rw, rh));
+
+            rv.setViewVisibility(R.id.tap_clock_host, View.VISIBLE);
+            rv.setViewPadding(R.id.tap_clock_host, Math.round(r.left), Math.round(r.top), Math.round(rw - r.right), Math.round(rh - r.bottom));
+            rv.setOnClickPendingIntent(R.id.tap_clock, activityPi(c, id * 10 + 1, orApp(c, new Intent(AlarmClock.ACTION_SHOW_ALARMS))));
+        }
+
+        // события календаря: скрыто, если событий нет; 3+ события листаются по кругу
+        RectF cr = Renderer.calRect(cfg, rw, rh);
+        if (strips.isEmpty()) {
+            rv.setViewVisibility(R.id.cal_host, View.GONE);
+        } else {
+            rv.setViewVisibility(R.id.cal_host, View.VISIBLE);
+            rv.setViewPadding(R.id.cal_host, Math.round(cr.left), Math.round(cr.top), Math.round(rw - cr.right), Math.round(rh - cr.bottom));
+            rv.removeAllViews(R.id.cal_flipper);
+            for (Bitmap b : strips) {
+                RemoteViews page = new RemoteViews(c.getPackageName(), R.layout.widget_page);
+                page.setImageViewBitmap(R.id.page_img, b);
+                rv.addView(R.id.cal_flipper, page);
+            }
+            Intent cal = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR);
+            rv.setOnClickPendingIntent(R.id.tap_cal, activityPi(c, id * 10 + 2, orApp(c, cal)));
         }
 
         // кнопка обновления (круглая, в правом верхнем углу)
         boolean show = cfg.optBoolean("refresh", true);
         rv.setViewVisibility(R.id.btn_refresh, show ? View.VISIBLE : View.GONE);
         if (show) {
-            rv.setViewPadding(R.id.btn_host, 0, Math.round(0.06f * h), Math.round(0.04f * w), 0);
+            rv.setViewPadding(R.id.btn_host, 0, Math.round(0.06f * rh), Math.round(0.04f * rw), 0);
             Intent ri = new Intent(c, TickReceiver.class).setAction(ACT_REFRESH);
             rv.setOnClickPendingIntent(R.id.btn_refresh, PendingIntent.getBroadcast(c, 1, ri,
                     PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));

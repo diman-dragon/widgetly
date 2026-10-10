@@ -77,7 +77,12 @@ final class Renderer {
     static float split(JSONObject cfg, int w) { return w * (float) cfg.optDouble("split", 48) / 100f; }
 
     static RectF clockRect(JSONObject cfg, int w, int h) {
-        return rf(0.06f * w, 0.08f * h, split(cfg, w) - 0.02f * w, 0.47f * h);
+        return rf(0.06f * w, 0.06f * h, split(cfg, w) - 0.02f * w, 0.42f * h);
+    }
+
+    /** Область событий календаря: под датой, две строки. */
+    static RectF calRect(JSONObject cfg, int w, int h) {
+        return rf(0.06f * w, 0.70f * h, split(cfg, w) - 0.02f * w, 0.94f * h);
     }
 
     static String clockSample(String fmt) { return fmt.contains("a") ? "00:00 PM" : "00:00"; }
@@ -118,7 +123,7 @@ final class Renderer {
             cv.drawRoundRect(new RectF(dens / 2, dens / 2, w - dens / 2, h - dens / 2), rad, rad, b);
         }
 
-        try { drawLeft(cv, cfg, w, h, dens, dateTs, drawClock, fg); } catch (Exception ignored) {}
+        try { drawLeft(c, cv, cfg, w, h, dens, dateTs, drawClock, fg); } catch (Exception ignored) {}
         try { drawRight(c, cv, cfg, w, h, dens, net, fg, fg2); } catch (Exception ignored) {}
         return bmp;
     }
@@ -238,7 +243,7 @@ final class Renderer {
     }
 
     // ---------- левая часть: часы, день недели, дата ----------
-    private static void drawLeft(Canvas cv, JSONObject cfg, int w, int h, float dens, long dateTs, boolean drawClock, int fg) {
+    private static void drawLeft(Context c, Canvas cv, JSONObject cfg, int w, int h, float dens, long dateTs, boolean drawClock, int fg) {
         float split = split(cfg, w), L = 0.06f * w, R = split - 0.02f * w;
         Date d = new Date(dateTs);
         JSONObject ck = sub(cfg, "clock"), wd = sub(cfg, "weekday"), dt = sub(cfg, "date");
@@ -259,15 +264,66 @@ final class Renderer {
             Paint p = paint(cs.isEmpty() ? fg : col(cs, -1, fg), 0.88f, wd.optString("font", "sans-serif"));
             p.setShadowLayer(3 * dens, 0, 1.5f * dens, 0x66000000);
             String s = cap(fmt(wd.optString("pattern", "EEEE"), "EEEE", d, null), wd.optBoolean("upper", false));
-            drawFit(cv, s, p, rf(L, 0.50f * h, R, 0.61f * h), "left", (float) wd.optDouble("scale", 1));
+            drawFit(cv, s, p, rf(L, 0.44f * h, R, 0.54f * h), "left", (float) wd.optDouble("scale", 1));
         }
         if (dt.optBoolean("show", true)) {
             String cs = dt.optString("color", "");
             Paint p = paint(cs.isEmpty() ? fg : col(cs, -1, fg), 1f, dt.optString("font", "sans-serif-medium"));
             p.setShadowLayer(3 * dens, 0, 1.5f * dens, 0x66000000);
             String s = fmt(dt.optString("pattern", "d MMMM yyyy"), "d MMMM yyyy", d, null);
-            drawFit(cv, s, p, rf(L, 0.62f * h, R, 0.77f * h), "left", (float) dt.optDouble("scale", 1));
+            drawFit(cv, s, p, rf(L, 0.55f * h, R, 0.67f * h), "left", (float) dt.optDouble("scale", 1));
         }
+        // события календаря: в превью рисуем первую страницу; на рабочем столе их показывают страницы ViewFlipper
+        JSONObject cal = sub(cfg, "calendar");
+        if (drawClock && cal.optBoolean("show", true)) {
+            List<List<CalendarService.Ev>> pg = CalendarService.pages(CalendarService.list(c, cal.optInt("days", 2)));
+            if (!pg.isEmpty()) drawEventPage(cv, calRect(cfg, w, h), pg.get(0), cfg, dens, fg);
+        }
+    }
+
+    // ---------- календарь: страница из двух строк ----------
+    static void drawEventPage(Canvas cv, RectF r, List<CalendarService.Ev> page, JSONObject cfg, float dens, int fg) {
+        JSONObject cal = sub(cfg, "calendar");
+        float lineH = r.height() / 2f;
+        float scale = (float) cal.optDouble("scale", 1);
+        String cs = cal.optString("color", "");
+        int color = cs.isEmpty() ? fg : col(cs, -1, fg);
+        android.text.TextPaint tp = new android.text.TextPaint(Paint.ANTI_ALIAS_FLAG);
+        tp.setTypeface(tf(cal.optString("font", "sans-serif")));
+        tp.setColor(color);
+        tp.setTextSize(Math.max(6f * dens, lineH * 0.62f * Math.min(1f, scale)));
+        tp.setShadowLayer(3 * dens, 0, 1.5f * dens, 0x66000000);
+        Paint dot = new Paint(Paint.ANTI_ALIAS_FLAG);
+        dot.setColor(0xFFFFC83D);
+        float dr = lineH * 0.09f;
+        Paint.FontMetrics fm = tp.getFontMetrics();
+        for (int i = 0; i < page.size() && i < 2; i++) {
+            CalendarService.Ev e = page.get(i);
+            float cy = r.top + lineH * (i + 0.5f), x = r.left;
+            cv.drawCircle(x + dr, cy, dr, dot);
+            x += dr * 2 + lineH * 0.3f;
+            float base = cy - (fm.ascent + fm.descent) / 2;
+            if (!e.label.isEmpty()) {
+                tp.setAlpha(190);
+                cv.drawText(e.label, x, base, tp);
+                x += tp.measureText(e.label) + lineH * 0.3f;
+                tp.setAlpha(255);
+            }
+            float avail = r.right - x;
+            if (avail > 4 * dens) {
+                CharSequence t = android.text.TextUtils.ellipsize(e.title, tp, avail, android.text.TextUtils.TruncateAt.END);
+                cv.drawText(t, 0, t.length(), x, base, tp);
+            }
+        }
+    }
+
+    /** Картинка-страница для ViewFlipper на рабочем столе. */
+    static Bitmap eventStrip(JSONObject cfg, List<CalendarService.Ev> page, RectF area, float dens) {
+        int w = Math.max(1, Math.round(area.width())), h = Math.max(1, Math.round(area.height()));
+        Bitmap b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        int fg = col(cfg.optString("fg", "#FFFFFF"), -1, Color.WHITE);
+        drawEventPage(new Canvas(b), rf(0, 0, w, h), page, cfg, dens, fg);
+        return b;
     }
 
     // ---------- собственные иконки погоды (без эмодзи: одинаково на всех версиях Android) ----------

@@ -17,9 +17,11 @@ jobs:
       KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -28,7 +30,7 @@ jobs:
       - name: Install JS deps
         run: npm install
 
-      - name: Generate Android project + apply native code
+      - name: Generate Android project and apply native code
         run: npm run android:setup
 
       - name: Debug APK (для установки на телефон)
@@ -37,21 +39,23 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: widget-studio-debug-apk
+          name: datalaw-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
 
-      # Release AAB для Google Play — только если в секретах репозитория есть ключ
+      # Подписанный AAB для Google Play — только если в секретах репозитория есть ключ загрузки.
+      - name: Decode upload keystore
+        if: env.KEYSTORE_B64 != ''
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+
       - name: Release AAB (signed)
         if: env.KEYSTORE_B64 != ''
         working-directory: android
-        run: |
-          ./gradlew bundleRelease
-          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
-          jarsigner -keystore "$RUNNER_TEMP/upload.jks" -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" \
-            app/build/outputs/bundle/release/app-release.aab "$KEY_ALIAS"
+        run: ./gradlew bundleRelease
 
       - uses: actions/upload-artifact@v4
         if: env.KEYSTORE_B64 != ''
         with:
-          name: widget-studio-release-aab
+          name: datalaw-release-aab
           path: android/app/build/outputs/bundle/release/app-release.aab

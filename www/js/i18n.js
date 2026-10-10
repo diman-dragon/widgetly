@@ -1,7 +1,7 @@
 // [ru, en]
 const T = {
   settings:['Настройки','Settings'], back:['Назад','Back'], addHome:['Добавить на рабочий стол','Add to home screen'],
-  pinFail:['Лаунчер не поддерживает быстрое добавление. Долгий тап по рабочему столу → Виджеты → Widget Studio.','Your launcher can’t pin widgets. Long-press home → Widgets → Widget Studio.'],
+  pinFail:['Лаунчер не поддерживает быстрое добавление. Долгий тап по рабочему столу → Виджеты → DataLaw.','Your launcher can’t pin widgets. Long-press home → Widgets → DataLaw.'],
   previewOnly:['Предпросмотр доступен только в приложении на Android','Preview is available in the Android app only'],
   look:['Внешний вид','Appearance'], opacity:['Прозрачность виджета','Widget opacity'], radius:['Скругление углов','Corner radius'],
   border:['Тонкая рамка','Thin border'], bgMode:['Фон слева','Left background'], sunset:['Закат','Sunset'], night:['Ночь','Night'],
@@ -25,6 +25,15 @@ const T = {
   about:['О приложении','About'], version:['Версия','Version'], privacy:['Политика конфиденциальности','Privacy policy'],
   wipe:['Сбросить все настройки','Reset everything'], confirmWipe:['Сбросить виджет и настройки к исходным?','Reset widget and settings to defaults?'],
 };
+Object.assign(T, {
+  calendar:['Календарь','Calendar'], calDays:['Показывать события','Show events for'], calToday:['только сегодня','today only'], dayShort:['дн.','d'],
+  calNeed:['Чтобы показывать события под датой, нужен доступ к календарю. Данные остаются на устройстве.','To show events under the date, calendar access is needed. Data stays on your device.'],
+  calGrant:['Разрешить доступ к календарю','Allow calendar access'],
+  calDenied:['Доступ не выдан. Открыть настройки приложения, чтобы разрешить?','Access not granted. Open app settings to allow it?'],
+  calHint:['Две строки; если событий больше двух — листаются по кругу. Нет событий — блок скрыт. Тап по событиям открывает календарь, тап по часам — часы.','Two lines; with more than two events they rotate. No events — the block is hidden. Tap events to open Calendar, tap the clock to open Clock.'],
+  updateWidget:['Обновить виджет на рабочем столе','Update widget on home screen'], updated:['Виджет обновлён — новый не создавался','Widget updated — no new one was created'],
+  rights:['Все права защищены.','All rights reserved.'],
+});
 const lang = (navigator.language || 'en').toLowerCase().startsWith('ru') ? 0 : 1;
 export const LANG = lang === 0 ? 'ru' : 'en';
 export const t = (k) => (T[k] ? T[k][lang] : k);
