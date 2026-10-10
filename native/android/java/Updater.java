@@ -39,10 +39,12 @@ final class Updater {
     private static final long TICK_MS = 5 * 60_000L;
     private static final Object LOCK = new Object();
 
-    static final String[] FAMILIES = {"sans-serif", "sans-serif-light", "sans-serif-thin", "sans-serif-medium",
-            "sans-serif-black", "sans-serif-condensed", "serif", "monospace", "casual", "cursive"};
-    private static final int[] CLK = {R.id.clock_f0, R.id.clock_f1, R.id.clock_f2, R.id.clock_f3, R.id.clock_f4,
-            R.id.clock_f5, R.id.clock_f6, R.id.clock_f7, R.id.clock_f8, R.id.clock_f9};
+    static final String[] FAMILIES = {"sans-serif", "sans-serif-light", "sans-serif-thin", "sans-serif-medium", "sans-serif-black", "sans-serif-condensed", "serif", "monospace", "casual", "cursive", "ws_lora", "ws_lora_bold", "ws_plex_serif", "ws_plex_serif_bold", "ws_poiret", "ws_jura_light", "ws_jura", "ws_tektur", "ws_jetbrains", "ws_geist_mono"};
+    /** Первые SYSTEM_COUNT — системные шрифты; остальные — встроенные (res/font), доступны виджету с Android 8. */
+    static final int SYSTEM_COUNT = 10;
+    /** Запасной системный шрифт для встроенных на Android 7.x. */
+    static final int[] FALLBACK = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 6, 6, 6, 2, 1, 3, 3, 7, 7};
+    private static final int[] CLK = {R.id.clock_f0, R.id.clock_f1, R.id.clock_f2, R.id.clock_f3, R.id.clock_f4, R.id.clock_f5, R.id.clock_f6, R.id.clock_f7, R.id.clock_f8, R.id.clock_f9, R.id.clock_f10, R.id.clock_f11, R.id.clock_f12, R.id.clock_f13, R.id.clock_f14, R.id.clock_f15, R.id.clock_f16, R.id.clock_f17, R.id.clock_f18, R.id.clock_f19};
 
     static int[] allIds(Context c, AppWidgetManager m) {
         return m.getAppWidgetIds(new ComponentName(c, WidgetProvider.class));
@@ -152,7 +154,7 @@ final class Updater {
         // календарь
         JSONObject cal = Renderer.sub(cfg, "calendar");
         List<CalendarService.Ev> evs = cal.optBoolean("show", true)
-                ? CalendarService.list(c, cal.optInt("days", 2)) : new ArrayList<CalendarService.Ev>();
+                ? CalendarService.list(c, cal.optInt("days", 2), cal.optJSONArray("ids")) : new ArrayList<CalendarService.Ev>();
         sig.append("|ev:").append(CalendarService.signature(evs));
 
         sig.append('|').append(cfg.toString().hashCode()).append('|').append(dts / 86400000L).append('|').append(sz[0]).append('x').append(sz[1]);
@@ -184,6 +186,7 @@ final class Updater {
     }
 
     private static RemoteViews build(Context c, int id, JSONObject cfg, Bitmap bmp, List<Bitmap> strips, int rw, int rh) {
+        Renderer.init(c);
         RemoteViews rv = new RemoteViews(c.getPackageName(), R.layout.widget_root);
         rv.setImageViewBitmap(R.id.bg_image, bmp);
 
@@ -201,6 +204,7 @@ final class Updater {
             String fmt = ck.optString("fmt", "HH:mm"), tz = ck.optString("tz", "");
             int fam = 1;
             for (int i = 0; i < FAMILIES.length; i++) if (FAMILIES[i].equals(ck.optString("font", "sans-serif-light"))) fam = i;
+            if (fam >= SYSTEM_COUNT && android.os.Build.VERSION.SDK_INT < 26) fam = FALLBACK[fam];
             int fg = Renderer.col(cfg.optString("fg", "#FFFFFF"), -1, 0xFFFFFFFF);
             String cs = ck.optString("color", "");
             int color = cs.isEmpty() ? fg : Renderer.col(cs, -1, fg);

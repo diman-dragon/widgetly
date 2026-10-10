@@ -144,6 +144,14 @@ public class WidgetPlugin extends Plugin {
         call.resolve(o);
     }
 
+    /** Календари устройства для выбора: показываем только те, что отметил пользователь. */
+    @PluginMethod
+    public void calendarList(PluginCall call) {
+        JSObject o = new JSObject();
+        o.put("calendars", CalendarService.calendars(ctx()).toString());
+        call.resolve(o);
+    }
+
     @PluginMethod
     public void calendarRequest(PluginCall call) {
         if (CalendarService.granted(ctx())) { calendarCb(call); return; }

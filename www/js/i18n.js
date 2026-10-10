@@ -33,6 +33,10 @@ Object.assign(T, {
   calHint:['Две строки; если событий больше двух — листаются по кругу. Нет событий — блок скрыт. Тап по событиям открывает календарь, тап по часам — часы.','Two lines; with more than two events they rotate. No events — the block is hidden. Tap events to open Calendar, tap the clock to open Clock.'],
   updateWidget:['Обновить виджет на рабочем столе','Update widget on home screen'], updated:['Виджет обновлён — новый не создавался','Widget updated — no new one was created'],
   rights:['Все права защищены.','All rights reserved.'],
+  calGranted:['Доступ к календарю выдан','Calendar access granted'], calList:['Какие календари показывать','Which calendars to show'],
+  calNone:['Календари не найдены','No calendars found'], by:['от DataLaw','by DataLaw'],
+  fontsCredit:['Шрифты: Lora, IBM Plex Serif, Poiret One, Jura, Tektur, JetBrains Mono, Geist Mono — лицензия SIL OFL 1.1.','Fonts: Lora, IBM Plex Serif, Poiret One, Jura, Tektur, JetBrains Mono, Geist Mono — SIL OFL 1.1.'],
+  calOneLeft:['Должен остаться хотя бы один календарь','At least one calendar must stay selected'],
 });
 const lang = (navigator.language || 'en').toLowerCase().startsWith('ru') ? 0 : 1;
 export const LANG = lang === 0 ? 'ru' : 'en';

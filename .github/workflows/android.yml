@@ -39,7 +39,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: datalaw-debug-apk
+          name: datalaw-widgetly-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
 
       # Подписанный AAB для Google Play — только если в секретах репозитория есть ключ загрузки.
@@ -57,5 +57,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: env.KEYSTORE_B64 != ''
         with:
-          name: datalaw-release-aab
+          name: datalaw-widgetly-release-aab
           path: android/app/build/outputs/bundle/release/app-release.aab

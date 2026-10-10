@@ -1,11 +1,11 @@
 import { native } from './native.js';
 import { t, LANG } from './i18n.js';
-import { FONTS, CLOCK_FMT, DATE_FMT, WEEKDAY_FMT, PREVIEW, SERVICES, KEY_URL, defaultCfg, defaultSettings, merge } from './defaults.js';
+import { FONTS, FONT_GROUPS, CLOCK_FMT, DATE_FMT, WEEKDAY_FMT, PREVIEW, SERVICES, KEY_URL, defaultCfg, defaultSettings, merge } from './defaults.js';
 
 const PRIVACY_URL = 'https://example.com/widget-studio/privacy'; // TODO: свой URL перед публикацией
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const S = { cfg: defaultCfg(), settings: defaultSettings(), screen: 'home', open: new Set(['look']), cities: [], hasPhoto: false, count: 0, calGranted: false };
+const S = { cfg: defaultCfg(), settings: defaultSettings(), screen: 'home', open: new Set(['look']), cities: [], hasPhoto: false, count: 0, calGranted: false, calendars: [] };
 const app = $('#app');
 
 // ---------- хранение / тема / навигация ----------
@@ -48,12 +48,13 @@ const txt = (p, ph = '') => `<input data-p="${p}" value="${esc(get(p))}" placeho
 const sel = (p, opts) => `<select data-p="${p}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(get(p)) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
 const sec = (id, title, body) => `<details class="sec" data-sec="${id}" ${S.open.has(id) ? 'open' : ''}><summary>${title}</summary><div>${body}</div></details>`;
 const colorRow = (p, fb) => f(t('color'), `${clr(p, fb)}<button class="sm" data-act="clr" data-p="${p}">${t('reset')}</button>`);
-const fontOpts = FONTS.map(([v, l]) => [v, l]);
+// Шрифты по группам (без засечек / с засечками / моно / декоративные)
+const fontSel = (p) => `<select data-p="${p}">${FONT_GROUPS.map(([g, ru, en]) => `<optgroup label="${LANG === 'ru' ? ru : en}">${FONTS.filter((x) => x[2] === g).map(([v, l]) => `<option value="${esc(v)}" ${v === get(p) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</optgroup>`).join('')}</select>`;
 
 // ---------- главный экран ----------
 function Home() {
   app.innerHTML = `
-  <header class="bar"><div class="brand"><img class="logo" src="img/datalaw-logo.png" alt=""><h1>DataLaw</h1></div><button class="icon" id="gear" aria-label="${t('settings')}">⚙️</button></header>
+  <header class="bar"><div class="brand"><img class="appicon" src="img/widgetly-icon.png" alt=""><div><h1>DataLaw Widgetly</h1></div></div><button class="icon" id="gear" aria-label="${t('settings')}">⚙️</button></header>
   <div class="pvwrap"><div id="pv"><img id="pvimg" alt=""></div></div>
   <div class="chips">${Object.keys(PREVIEW).map((k) => `<button data-prev="${k}" class="${k === S.settings.preview ? 'on' : ''}">${k.replace('x', '×')}</button>`).join('')}</div>
   ${native.isNative ? '' : `<p class="mu" style="padding:0 14px">${t('previewOnly')}</p>`}
@@ -83,13 +84,38 @@ function Home() {
   drawSecs(); setPvRatio(); renderPv(); pinLabel(); refreshState();
 }
 
+// Доступ запрашивается самим блоком календаря: при включении блока и по кнопке; выбор календарей — здесь же
+function calAccess() {
+  if (!native.isNative) return '';
+  return S.calGranted
+    ? `<p class="mu">✓ ${t('calGranted')}</p>`
+    : `<p class="mu">${t('calNeed')}</p><div class="row" style="margin-top:0"><button class="sm primary" data-act="calgrant">${t('calGrant')}</button></div>`;
+}
+function calList() {
+  if (!native.isNative || !S.calGranted) return '';
+  if (!S.calendars.length) return `<p class="mu">${t('calNone')}</p>`;
+  const ids = S.cfg.calendar.ids || [];
+  return `<h2 style="margin:12px 2px 4px">${t('calList')}</h2>` + S.calendars.map((c) =>
+    `<label class="chk"><input type="checkbox" data-cal="${esc(c.id)}" ${!ids.length || ids.includes(c.id) ? 'checked' : ''}>
+      <span class="dot" style="background:#${((c.color >>> 0) & 0xFFFFFF).toString(16).padStart(6, '0')}"></span>
+      <span>${esc(c.name || c.account)}${c.account && c.name !== c.account ? ` <span class="mu">${esc(c.account)}</span>` : ''}</span></label>`).join('');
+}
+async function requestCalendar() {
+  const ok = await native.calendarRequest();
+  S.calGranted = ok;
+  S.calendars = ok ? await native.calendarList() : [];
+  if (!ok && confirm(t('calDenied'))) native.openAppSettings();
+  drawSecs(); renderPv(); native.refresh(true);
+}
+
 function pinLabel() { const b = $('#pin'); if (b) b.textContent = S.count > 0 ? `↻ ${t('updateWidget')}` : `＋ ${t('addHome')}`; }
 function msg(text) { const m = $('#msg'); if (!m) return; m.textContent = text; setTimeout(() => { if (m.textContent === text) m.textContent = ''; }, 3500); }
 // Число виджетов на рабочем столе и состояние доступа к календарю (после возврата из системных настроек — тоже)
 async function refreshState() {
   const [n, g] = await Promise.all([native.widgetCount(), native.calendarState()]);
-  const changed = g !== S.calGranted;
-  S.count = n; S.calGranted = g; pinLabel();
+  const list = g ? await native.calendarList() : [];
+  const changed = g !== S.calGranted || list.length !== S.calendars.length;
+  S.count = n; S.calGranted = g; S.calendars = list; pinLabel();
   if (changed && S.screen === 'home' && $('#secs')) { drawSecs(); renderPv(); }
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.screen === 'home') refreshState(); });
@@ -107,20 +133,19 @@ function drawSecs() {
       f(t('panel'), clr('panel')) + f(t('panel2'), clr('panel2')) + f(t('fg'), clr('fg')) + f(t('fg2'), clr('fg2')) +
       chk('refresh', t('refreshBtn'))) +
     sec('clock', t('clock'),
-      chk('clock.show', t('show')) + f(t('fmt'), sel('clock.fmt', CLOCK_FMT.map((x) => [x, x]))) + f(t('font'), sel('clock.font', fontOpts)) +
+      chk('clock.show', t('show')) + f(t('fmt'), sel('clock.fmt', CLOCK_FMT.map((x) => [x, x]))) + f(t('font'), fontSel('clock.font')) +
       f(t('size'), rng('clock.scale', 0.4, 1, 0.05)) + colorRow('clock.color', 'fg') + f(t('tz'), txt('clock.tz', 'Europe/Berlin'))) +
     sec('weekday', t('weekday'),
-      chk('weekday.show', t('show')) + f(t('fmt'), sel('weekday.pattern', WEEKDAY_FMT.map((x) => [x, x]))) + f(t('font'), sel('weekday.font', fontOpts)) +
+      chk('weekday.show', t('show')) + f(t('fmt'), sel('weekday.pattern', WEEKDAY_FMT.map((x) => [x, x]))) + f(t('font'), fontSel('weekday.font')) +
       f(t('size'), rng('weekday.scale', 0.4, 1, 0.05)) + colorRow('weekday.color', 'fg') + chk('weekday.upper', t('upper'))) +
     sec('date', t('date'),
       chk('date.show', t('show')) +
       f(t('fmt'), `<input data-p="date.pattern" list="dfl" value="${esc(S.cfg.date.pattern)}"><datalist id="dfl">${DATE_FMT.map((x) => `<option value="${x}">`).join('')}</datalist>`) +
-      f(t('font'), sel('date.font', fontOpts)) + f(t('size'), rng('date.scale', 0.4, 1, 0.05)) + colorRow('date.color', 'fg')) +
+      f(t('font'), fontSel('date.font')) + f(t('size'), rng('date.scale', 0.4, 1, 0.05)) + colorRow('date.color', 'fg')) +
     sec('calendar', t('calendar'),
-      chk('calendar.show', t('show')) +
-      (native.isNative && !S.calGranted ? `<p class="mu">${t('calNeed')}</p><div class="row" style="margin-top:0"><button class="sm primary" data-act="calgrant">${t('calGrant')}</button></div>` : '') +
+      chk('calendar.show', t('show')) + calAccess() + calList() +
       f(t('calDays'), sel('calendar.days', [[1, t('calToday')], [2, '2 ' + t('dayShort')], [3, '3 ' + t('dayShort')], [7, '7 ' + t('dayShort')]])) +
-      f(t('font'), sel('calendar.font', fontOpts)) + f(t('size'), rng('calendar.scale', 0.4, 1, 0.05)) + colorRow('calendar.color', 'fg') +
+      f(t('font'), fontSel('calendar.font')) + f(t('size'), rng('calendar.scale', 0.4, 1, 0.05)) + colorRow('calendar.color', 'fg') +
       `<p class="mu">${t('calHint')}</p>`) +
     sec('weather', t('weather'),
       chk('weather.show', t('show')) +
@@ -133,18 +158,25 @@ function drawSecs() {
       f(t('days'), sel('weather.days', [[0, '0'], [1, '1'], [2, '2'], [3, '3']])) +
       f(t('hours'), sel('weather.hours', [[6, '6'], [12, '12'], [24, '24']])) +
       chk('weather.showCountry', t('showCountry')) + chk('weather.showCond', t('showCond')) + chk('weather.showHiLo', t('showHiLo')) +
-      f(t('font'), sel('weather.font', fontOpts)) + f(t('size'), rng('weather.scale', 0.4, 1, 0.05)) +
+      f(t('font'), fontSel('weather.font')) + f(t('size'), rng('weather.scale', 0.4, 1, 0.05)) +
       `<p class="mu">${t('weatherNote')}</p>`);
 }
 
 const NUM = new Set(['opacity', 'radius', 'dim', 'split', 'clock.scale', 'weekday.scale', 'date.scale', 'weather.scale', 'weather.days', 'weather.hours', 'calendar.scale', 'calendar.days']);
 function onField(e) {
   const el = e.target, p = el.dataset.p;
+  if (el.dataset.cal !== undefined) {   // выбор календарей
+    const boxes = [...document.querySelectorAll('[data-cal]')], on = boxes.filter((b) => b.checked);
+    if (!on.length) { el.checked = true; msg(t('calOneLeft')); return; }
+    S.cfg.calendar.ids = on.length === boxes.length ? [] : on.map((b) => b.dataset.cal);
+    touch(); return;
+  }
   if (!p) return;
   let v = el.type === 'checkbox' ? el.checked : NUM.has(p) ? Number(el.value) : el.value;
   set(p, v);
   if (p === 'bgMode' || p === 'weather.service') drawSecs();
   touch();
+  if (p === 'calendar.show' && v && native.isNative && !S.calGranted) requestCalendar();   // блок включили — просим доступ к календарю
 }
 
 async function citySearch(q) {
@@ -159,12 +191,7 @@ async function onAct(e) {
   if (!bt) return;
   const act = bt.dataset.act;
   if (act === 'clr') { set(bt.dataset.p, ''); drawSecs(); touch(); }
-  else if (act === 'calgrant') {
-    const ok = await native.calendarRequest();
-    S.calGranted = ok;
-    if (!ok && confirm(t('calDenied'))) native.openAppSettings();
-    drawSecs(); renderPv(); native.refresh(true);
-  }
+  else if (act === 'calgrant') await requestCalendar();
   else if (act === 'photo') $('#file').click();
   else if (act === 'rmphoto') { await native.removeBackground(); S.hasPhoto = false; S.cfg.bgMode = 'sunset'; S.cfg.photoRev = Date.now(); drawSecs(); touch(); }
   else if (act === 'check') { $('#chk').textContent = '…'; $('#chk').textContent = await native.checkWeather(S.cfg.weather); renderPv(); }
@@ -200,10 +227,11 @@ async function Settings() {
     <h2>${t('updates')}</h2><div class="panel"><p class="mu" style="margin:0">${t('updatesText')}</p></div>
     <h2>${t('about')}</h2>
     <div class="panel">
-      <div class="aboutlogo"><img class="logo" src="img/datalaw-logo.png" alt=""><b>DataLaw</b></div>
+      <div class="aboutlogo"><img class="appicon big" src="img/widgetly-icon.png" alt=""><div><b>DataLaw Widgetly</b></div><img class="logo" src="img/datalaw-logo.png" alt="DataLaw" style="margin-left:auto"></div>
       <div class="f"><span>${t('version')}</span><b>${esc(info.version)} (${esc(info.build)})</b></div>
       <div class="row"><button class="sm" data-act="priv">${t('privacy')}</button><button class="sm danger" data-act="wipe">${t('wipe')}</button></div>
       <p class="mu">© ${new Date().getFullYear()} DataLaw. ${t('rights')}</p>
+      <p class="mu">${t('fontsCredit')}</p>
     </div>
   </main>`;
   $('#back').onclick = () => history.back();

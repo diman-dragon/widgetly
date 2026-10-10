@@ -43,6 +43,7 @@ export const native = {
   async pinWidget() { return P ? await P.pinWidget() : { supported: false, exists: false }; },
   async widgetCount() { return P ? (await P.widgetCount()).count : 0; },
   async calendarState() { return P ? (await P.calendarState()).granted : false; },
+  async calendarList() { if (!P) return []; try { return JSON.parse((await P.calendarList()).calendars); } catch { return []; } },
   async calendarRequest() { return P ? (await P.calendarRequest()).granted : false; },
   async openAppSettings() { if (P) await P.openAppSettings(); },
   async openUrl(url) { if (P) await P.openUrl({ url }); else window.open(url, '_blank'); },

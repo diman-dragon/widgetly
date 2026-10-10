@@ -1,8 +1,8 @@
 {
-  "name": "datalaw-widget",
-  "version": "4.0.0",
+  "name": "widgetly",
+  "version": "4.1.0",
   "private": true,
-  "description": "DataLaw — clock, weather and calendar home-screen widget (Capacitor 8)",
+  "description": "DataLaw Widgetly — clock, weather and calendar home-screen widget (Capacitor 8)",
   "scripts": {
     "android:setup": "node scripts/setup-android.js",
     "android:open": "npx cap open android",

@@ -28,8 +28,28 @@ final class Renderer {
         } catch (Exception e) { return def; }
     }
 
-    static Typeface tf(String fam) {
-        return Typeface.create(fam == null || fam.isEmpty() ? "sans-serif" : fam, Typeface.NORMAL);
+    private static Context appCtx;
+    private static final Map<String, Typeface> FONT_CACHE = new HashMap<>();
+
+    /** Нужен для загрузки встроенных шрифтов (res/font). Вызывается перед любой отрисовкой. */
+    static void init(Context c) { if (c != null) appCtx = c.getApplicationContext(); }
+
+    /** Системные семейства — по имени; встроенные (ws_*) — из res/font через ResourcesCompat (работает с Android 7). */
+    static synchronized Typeface tf(String fam) {
+        if (fam == null || fam.isEmpty()) fam = "sans-serif";
+        Typeface t = FONT_CACHE.get(fam);
+        if (t != null) return t;
+        if (fam.startsWith("ws_") && appCtx != null) {
+            try {
+                int id = appCtx.getResources().getIdentifier(fam, "font", appCtx.getPackageName());
+                if (id != 0) t = androidx.core.content.res.ResourcesCompat.getFont(appCtx, id);
+            } catch (Exception ignored) {}
+            if (t == null) t = Typeface.create(fam.contains("lora") || fam.contains("serif") ? "serif" : "sans-serif", Typeface.NORMAL);
+        } else {
+            t = Typeface.create(fam, Typeface.NORMAL);
+        }
+        FONT_CACHE.put(fam, t);
+        return t;
     }
 
     static RectF rf(float l, float t, float r, float b) { return new RectF(l, t, r, b); }
@@ -98,6 +118,7 @@ final class Renderer {
 
     // ---------- main ----------
     static Bitmap render(Context c, JSONObject cfg, int w, int h, float dens, long dateTs, boolean drawClock, boolean net) {
+        init(c);
         Bitmap bmp = Bitmap.createBitmap(Math.max(1, w), Math.max(1, h), Bitmap.Config.ARGB_8888);
         Canvas cv = new Canvas(bmp);
         float rad = (float) cfg.optDouble("radius", 28) * dens;
@@ -276,7 +297,7 @@ final class Renderer {
         // события календаря: в превью рисуем первую страницу; на рабочем столе их показывают страницы ViewFlipper
         JSONObject cal = sub(cfg, "calendar");
         if (drawClock && cal.optBoolean("show", true)) {
-            List<List<CalendarService.Ev>> pg = CalendarService.pages(CalendarService.list(c, cal.optInt("days", 2)));
+            List<List<CalendarService.Ev>> pg = CalendarService.pages(CalendarService.list(c, cal.optInt("days", 2), cal.optJSONArray("ids")));
             if (!pg.isEmpty()) drawEventPage(cv, calRect(cfg, w, h), pg.get(0), cfg, dens, fg);
         }
     }
@@ -294,12 +315,12 @@ final class Renderer {
         tp.setTextSize(Math.max(6f * dens, lineH * 0.62f * Math.min(1f, scale)));
         tp.setShadowLayer(3 * dens, 0, 1.5f * dens, 0x66000000);
         Paint dot = new Paint(Paint.ANTI_ALIAS_FLAG);
-        dot.setColor(0xFFFFC83D);
         float dr = lineH * 0.09f;
         Paint.FontMetrics fm = tp.getFontMetrics();
         for (int i = 0; i < page.size() && i < 2; i++) {
             CalendarService.Ev e = page.get(i);
             float cy = r.top + lineH * (i + 0.5f), x = r.left;
+            dot.setColor(e.color != 0 ? e.color : 0xFFFFC83D);   // точка цвета календаря
             cv.drawCircle(x + dr, cy, dr, dot);
             x += dr * 2 + lineH * 0.3f;
             float base = cy - (fm.ascent + fm.descent) / 2;

@@ -67,7 +67,8 @@ walk(path.join(main, 'res'), (p) => {
 const g = path.join(root, 'android/app/build.gradle');
 if (fs.existsSync(g)) {
   const [a = 1, b = 0, c = 0] = pkg.version.split('.').map(Number);
-  const vc = process.env.VERSION_CODE || process.env.GITHUB_RUN_NUMBER || (a * 10000 + b * 100 + c);
+  // versionCode обязан расти, иначе Android не даст обновить приложение. CI: номер запуска; локально: версия + минуты.
+  const vc = process.env.VERSION_CODE || process.env.GITHUB_RUN_NUMBER || (a * 10000 + b * 100 + c) * 100 + (Math.floor(Date.now() / 60000) % 100);
   let s = fs.readFileSync(g, 'utf8');
   s = s.replace(/versionCode\s+\d+/, `versionCode ${vc}`).replace(/versionName\s+"[^"]*"/, `versionName "${pkg.version}"`);
 
@@ -77,6 +78,14 @@ if (fs.existsSync(g)) {
   const signing = `
     // WS-SIGNING-BEGIN
     signingConfigs {
+        // Фиксированный debug-ключ из репозитория: каждая сборка подписана одним и тем же ключом,
+        // поэтому новый APK ставится поверх установленного без удаления (при том же appId).
+        debug {
+            storeFile file("debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
         release {
             if (System.getenv("KEYSTORE_PATH")) {
                 storeFile file(System.getenv("KEYSTORE_PATH"))
@@ -92,6 +101,7 @@ if (fs.existsSync(g)) {
   s = s.replace(/\n\s*\/\/ WS-RELEASE-SIGN\n[^\n]*\n/g, '\n');
   s = s.replace(/(buildTypes\s*\{\s*release\s*\{)/, `$1\n            // WS-RELEASE-SIGN\n            if (System.getenv("KEYSTORE_PATH")) { signingConfig signingConfigs.release }`);
   fs.writeFileSync(g, s);
+  fs.copyFileSync(path.join(src, 'debug.keystore'), path.join(root, 'android/app/debug.keystore'));
 }
 
 run('npx cap sync android');

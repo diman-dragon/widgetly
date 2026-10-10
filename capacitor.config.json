@@ -1,6 +1,6 @@
 {
-  "appId": "com.datalaw.clockweather",
-  "appName": "DataLaw",
+  "appId": "com.widgetstudio.app",
+  "appName": "DataLaw Widgetly",
   "webDir": "www",
   "android": {
     "allowMixedContent": false

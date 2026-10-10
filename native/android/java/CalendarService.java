@@ -8,7 +8,11 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.provider.CalendarContract;
 import android.text.format.DateFormat;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import java.text.SimpleDateFormat;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -30,6 +34,7 @@ final class CalendarService {
         String label = "";   // время/день: «09:30», «Пт 18:00», пусто для «весь день сегодня»
         String title = "";
         long sortKey;
+        int color;           // цвет календаря (ARGB), 0 — нет
     }
 
     static boolean granted(Context c) {
@@ -53,7 +58,42 @@ final class CalendarService {
         return l.getTimeInMillis();
     }
 
-    static List<Ev> list(Context c, int days) {
+    /** Список календарей устройства для выбора в редакторе: [{id,name,account,color}]. */
+    static JSONArray calendars(Context c) {
+        JSONArray out = new JSONArray();
+        if (!granted(c)) return out;
+        Cursor cur = null;
+        try {
+            String[] proj = {CalendarContract.Calendars._ID, CalendarContract.Calendars.CALENDAR_DISPLAY_NAME,
+                    CalendarContract.Calendars.ACCOUNT_NAME, CalendarContract.Calendars.CALENDAR_COLOR};
+            cur = c.getContentResolver().query(CalendarContract.Calendars.CONTENT_URI, proj, null, null, null);
+            while (cur != null && cur.moveToNext()) {
+                JSONObject o = new JSONObject();
+                o.put("id", String.valueOf(cur.getLong(0)));
+                o.put("name", cur.getString(1) == null ? "" : cur.getString(1));
+                o.put("account", cur.getString(2) == null ? "" : cur.getString(2));
+                o.put("color", cur.getInt(3) | 0xFF000000);
+                out.put(o);
+            }
+        } catch (Exception ignored) {
+            // нет доступа/провайдера — пустой список
+        } finally {
+            if (cur != null) cur.close();
+        }
+        return out;
+    }
+
+    private static Set<String> idSet(JSONArray ids) {
+        Set<String> s = new HashSet<>();
+        for (int i = 0; ids != null && i < ids.length(); i++) {
+            try { s.add(ids.getString(i)); } catch (Exception ignored) {}
+        }
+        return s;
+    }
+
+    /** ids — выбранные календари; пусто/null — все видимые. */
+    static List<Ev> list(Context c, int days, JSONArray ids) {
+        Set<String> only = idSet(ids);
         List<Ev> out = new ArrayList<>();
         if (!granted(c)) return out;
         try {
@@ -68,10 +108,12 @@ final class CalendarService {
             ContentUris.appendId(b, startToday - pad);
             ContentUris.appendId(b, windowEnd + pad);
             String[] proj = {CalendarContract.Instances.TITLE, CalendarContract.Instances.BEGIN,
-                    CalendarContract.Instances.END, CalendarContract.Instances.ALL_DAY};
+                    CalendarContract.Instances.END, CalendarContract.Instances.ALL_DAY,
+                    CalendarContract.Instances.CALENDAR_ID, CalendarContract.Instances.CALENDAR_COLOR};
             Cursor cur;
             try {
-                cur = c.getContentResolver().query(b.build(), proj, CalendarContract.Instances.VISIBLE + "=1", null, null);
+                // выбраны конкретные календари — фильтруем по ним; иначе берём все видимые
+                cur = c.getContentResolver().query(b.build(), proj, only.isEmpty() ? CalendarContract.Instances.VISIBLE + "=1" : null, null, null);
             } catch (Exception e) {
                 cur = c.getContentResolver().query(b.build(), proj, null, null, null);
             }
@@ -84,9 +126,11 @@ final class CalendarService {
                     String title = cur.getString(0);
                     long begin = cur.getLong(1), end = cur.getLong(2);
                     boolean allDay = cur.getInt(3) == 1;
+                    if (!only.isEmpty() && !only.contains(String.valueOf(cur.getLong(4)))) continue;
                     if (title == null || title.trim().isEmpty()) title = WeatherService.ru() ? "(без названия)" : "(no title)";
                     Ev e = new Ev();
                     e.title = title.trim().replace('\n', ' ');
+                    e.color = cur.getInt(5) | 0xFF000000;
                     if (allDay) {
                         long s = localMidnightOfUtcDate(begin), en = localMidnightOfUtcDate(end);
                         if (!(en > startToday && s < windowEnd)) continue;
